@@ -1,0 +1,13 @@
+# For the IsaacLab training environment (replaces `hora_requirements.txt` /
+# IsaacGym for training -- see README for the IsaacLab installation guide).
+# Install IsaacLab first (its own Isaac Sim + Python combo), then these on top,
+# into that same Python environment:
+#   python -m pip install -r hora_isaaclab_requirements.txt
+
+hydra-core>=1.1
+termcolor
+omegaconf
+gym
+tensorboard
+tensorboardx
+wandb

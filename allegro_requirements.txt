@@ -1,0 +1,5 @@
+# Python 3.10+
+# For ROS 2 Humble deployment environment
+
+rclpy
+hydra-core>=1.1

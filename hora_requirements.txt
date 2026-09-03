@@ -1,0 +1,11 @@
+# Python 3.8 (compatible with Python 3.6-3.8)
+# For Isaac Gym training environment
+
+hydra-core>=1.1
+termcolor
+omegaconf
+gym
+tensorboard
+tensorboardx
+numpy==1.23.1
+wandb
