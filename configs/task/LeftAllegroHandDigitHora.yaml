@@ -1,0 +1,16 @@
+name: LeftAllegroHandDigitHora
+defaults:
+  - AllegroHandHora
+env:
+  reset_height_threshold: 0.625
+  grasp_cache_name: 'allegro_digit_left'
+
+  reward:
+    rotateRewardScale: 1.25
+
+  asset:
+     handAsset: 'assets/allegro/allegro_digit_left_elastomer.urdf'
+     # DIGIT fingertips add a fixed housing + elastomer link past each standard
+     # `link_*_tip` -- the elastomer pad is the surface that actually touches the
+     # object, so grasp-contact detection should key off it instead.
+     fingertipLinkNames: ['link_3_0_tip_elastomer', 'link_7_0_tip_elastomer', 'link_11_0_tip_elastomer', 'link_15_0_tip_elastomer']

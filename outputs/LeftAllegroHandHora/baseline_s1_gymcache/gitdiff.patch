@@ -1,0 +1,3662 @@
+diff --git a/.gitignore b/.gitignore
+index 62e2658..aa0bd1f 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -211,3 +211,6 @@ debug/
+ marimo/_static/
+ marimo/_lsp/
+ __marimo__/
++
++# IsaacLab URDF->USD conversion cache (see hora/tasks/isaaclab)
++usd_cache/
+diff --git a/assets/allegro/allegro_hora.urdf b/assets/allegro/allegro_hora.urdf
+index 9fb6c9b..08d39f0 100644
+--- a/assets/allegro/allegro_hora.urdf
++++ b/assets/allegro/allegro_hora.urdf
+@@ -19,7 +19,7 @@ and one fixed link will be added for the tip. -->
+   <link name="base_link">
+     <visual>
+       <geometry>
+-        <mesh filename="allegro/meshes/allegro/base_link.obj"/>
++        <mesh filename="meshes/allegro/base_link.obj"/>
+       </geometry>
+       <!-- LEFT -->
+       <!-- <origin rpy="${-90*DEG2RAD} 0 0" xyz="0 0 0 "/> -->
+@@ -49,10 +49,10 @@ and one fixed link will be added for the tip. -->
+   <!-- FINGERS -->
+   <!-- RIGHT HAND due to which finger is number 0 -->
+   <!-- for LEFT HAND switch the sign of the **offset_origin_y** and **finger_angle_r** parameters-->
+-  <link name="link_0.0">
++  <link name="link_0_0">
+     <visual>
+       <geometry>
+-        <mesh filename="allegro/meshes/allegro/link_0.0.obj"/>
++        <mesh filename="meshes/allegro/link_0_0.obj"/>
+       </geometry>
+       <material name="black"/>
+     </visual>
+@@ -70,17 +70,17 @@ and one fixed link will be added for the tip. -->
+                izz="1.01666658333e-06" />
+     </inertial>
+   </link>
+-  <joint name="joint_0.0" type="revolute">
++  <joint name="joint_0_0" type="revolute">
+     <axis xyz="0 0 1"/>
+     <limit effort="0.35" lower="-0.47" upper="0.47" velocity="6.283"/>
+     <parent link="base_link"/>
+-    <child link="link_0.0"/>
++    <child link="link_0_0"/>
+     <origin rpy="-0.08726646255 0 0" xyz="0 0.0435 -0.001542"/>
+   </joint>
+-  <link name="link_1.0">
++  <link name="link_1_0">
+     <visual>
+       <geometry>
+-        <mesh filename="allegro/meshes/allegro/link_1.0.obj"/>
++        <mesh filename="meshes/allegro/link_1_0.obj"/>
+       </geometry>
+       <material name="black"/>
+     </visual>
+@@ -98,17 +98,17 @@ and one fixed link will be added for the tip. -->
+                izz="7.95654166667e-05" />
+     </inertial>
+   </link>
+-  <joint name="joint_1.0" type="revolute">
++  <joint name="joint_1_0" type="revolute">
+     <limit effort="0.35" lower="-0.196" upper="1.61" velocity="6.283"/>
+     <axis xyz="0 1 0"/>
+-    <parent link="link_0.0"/>
+-    <child link="link_1.0"/>
++    <parent link="link_0_0"/>
++    <child link="link_1_0"/>
+     <origin xyz="0 0 0.0164"/>
+   </joint>
+-  <link name="link_2.0">
++  <link name="link_2_0">
+     <visual>
+       <geometry>
+-        <mesh filename="allegro/meshes/allegro/link_2.0.obj"/>
++        <mesh filename="meshes/allegro/link_2_0.obj"/>
+       </geometry>
+       <material name="black"/>
+     </visual>
+@@ -126,17 +126,17 @@ and one fixed link will be added for the tip. -->
+                izz="2.63979183333e-05" />
+     </inertial>
+   </link>
+-  <joint name="joint_2.0" type="revolute">
++  <joint name="joint_2_0" type="revolute">
+     <axis xyz="0 1 0"/>
+     <limit effort="0.35" lower="-0.174" upper="1.709" velocity="6.283"/>
+-    <parent link="link_1.0"/>
+-    <child link="link_2.0"/>
++    <parent link="link_1_0"/>
++    <child link="link_2_0"/>
+     <origin xyz="0 0 0.054"/>
+   </joint>
+-  <link name="link_3.0">
++  <link name="link_3_0">
+     <visual>
+       <geometry>
+-        <mesh filename="allegro/meshes/allegro/link_3.0.obj"/>
++        <mesh filename="meshes/allegro/link_3_0.obj"/>
+       </geometry>
+       <material name="black"/>
+     </visual>
+@@ -159,14 +159,14 @@ and one fixed link will be added for the tip. -->
+                izz="4.701248e-06" />
+     </inertial>
+   </link>
+-  <joint name="joint_3.0" type="revolute">
++  <joint name="joint_3_0" type="revolute">
+     <axis xyz="0 1 0"/>
+     <limit effort="0.35" lower="-0.227" upper="1.618" velocity="6.283"/>
+-    <parent link="link_2.0"/>
+-    <child link="link_3.0"/>
++    <parent link="link_2_0"/>
++    <child link="link_3_0"/>
+     <origin xyz="0 0 0.0384"/>
+   </joint>
+-  <link name="link_3.0_tip">
++  <link name="link_3_0_tip">
+     <visual>
+       <geometry>
+         <sphere radius="0.01235"/>
+@@ -192,15 +192,15 @@ and one fixed link will be added for the tip. -->
+                izz="9.68e-07" />
+      </inertial>
+   </link>
+-  <joint name="joint_3.0_tip" type="fixed">
+-    <parent link="link_3.0"/>
+-    <child link="link_3.0_tip"/>
++  <joint name="joint_3_0_tip" type="fixed">
++    <parent link="link_3_0"/>
++    <child link="link_3_0_tip"/>
+     <origin rpy="0 0 0" xyz="0 0 0.0147"/>
+   </joint>
+-  <link name="link_4.0">
++  <link name="link_4_0">
+     <visual>
+       <geometry>
+-        <mesh filename="allegro/meshes/allegro/link_0.0.obj"/>
++        <mesh filename="meshes/allegro/link_0_0.obj"/>
+       </geometry>
+       <material name="black"/>
+     </visual>
+@@ -218,17 +218,17 @@ and one fixed link will be added for the tip. -->
+                izz="1.01666658333e-06" />
+     </inertial>
+   </link>
+-  <joint name="joint_4.0" type="revolute">
++  <joint name="joint_4_0" type="revolute">
+     <axis xyz="0 0 1"/>
+     <limit effort="0.35" lower="-0.47" upper="0.47" velocity="6.283"/>
+     <parent link="base_link"/>
+-    <child link="link_4.0"/>
++    <child link="link_4_0"/>
+     <origin rpy="0.0 0 0" xyz="0 0 0.0007"/>
+   </joint>
+-  <link name="link_5.0">
++  <link name="link_5_0">
+     <visual>
+       <geometry>
+-        <mesh filename="allegro/meshes/allegro/link_1.0.obj"/>
++        <mesh filename="meshes/allegro/link_1_0.obj"/>
+       </geometry>
+       <material name="black"/>
+     </visual>
+@@ -246,17 +246,17 @@ and one fixed link will be added for the tip. -->
+                izz="7.95654166667e-05" />
+     </inertial>
+   </link>
+-  <joint name="joint_5.0" type="revolute">
++  <joint name="joint_5_0" type="revolute">
+     <limit effort="0.35" lower="-0.196" upper="1.61" velocity="6.283"/>
+     <axis xyz="0 1 0"/>
+-    <parent link="link_4.0"/>
+-    <child link="link_5.0"/>
++    <parent link="link_4_0"/>
++    <child link="link_5_0"/>
+     <origin xyz="0 0 0.0164"/>
+   </joint>
+-  <link name="link_6.0">
++  <link name="link_6_0">
+     <visual>
+       <geometry>
+-        <mesh filename="allegro/meshes/allegro/link_2.0.obj"/>
++        <mesh filename="meshes/allegro/link_2_0.obj"/>
+       </geometry>
+       <material name="black"/>
+     </visual>
+@@ -274,17 +274,17 @@ and one fixed link will be added for the tip. -->
+                izz="2.63979183333e-05" />
+     </inertial>
+   </link>
+-  <joint name="joint_6.0" type="revolute">
++  <joint name="joint_6_0" type="revolute">
+     <axis xyz="0 1 0"/>
+     <limit effort="0.35" lower="-0.174" upper="1.709" velocity="6.283"/>
+-    <parent link="link_5.0"/>
+-    <child link="link_6.0"/>
++    <parent link="link_5_0"/>
++    <child link="link_6_0"/>
+     <origin xyz="0 0 0.054"/>
+   </joint>
+-  <link name="link_7.0">
++  <link name="link_7_0">
+     <visual>
+       <geometry>
+-        <mesh filename="allegro/meshes/allegro/link_3.0.obj"/>
++        <mesh filename="meshes/allegro/link_3_0.obj"/>
+       </geometry>
+       <material name="black"/>
+     </visual>
+@@ -306,14 +306,14 @@ and one fixed link will be added for the tip. -->
+                izz="4.701248e-06" />
+     </inertial>
+   </link>
+-  <joint name="joint_7.0" type="revolute">
++  <joint name="joint_7_0" type="revolute">
+     <axis xyz="0 1 0"/>
+     <limit effort="0.35" lower="-0.227" upper="1.618" velocity="6.283"/>
+-    <parent link="link_6.0"/>
+-    <child link="link_7.0"/>
++    <parent link="link_6_0"/>
++    <child link="link_7_0"/>
+     <origin xyz="0 0 0.0384"/>
+   </joint>
+-  <link name="link_7.0_tip">
++  <link name="link_7_0_tip">
+     <visual>
+       <geometry>
+         <sphere radius="0.01235"/>
+@@ -339,15 +339,15 @@ and one fixed link will be added for the tip. -->
+                izz="9.68e-07" />
+      </inertial>
+   </link>
+-  <joint name="joint_7.0_tip" type="fixed">
+-    <parent link="link_7.0"/>
+-    <child link="link_7.0_tip"/>
++  <joint name="joint_7_0_tip" type="fixed">
++    <parent link="link_7_0"/>
++    <child link="link_7_0_tip"/>
+     <origin rpy="0 0 0" xyz="0 0 0.0147"/>
+   </joint>
+-  <link name="link_8.0">
++  <link name="link_8_0">
+     <visual>
+       <geometry>
+-        <mesh filename="allegro/meshes/allegro/link_0.0.obj"/>
++        <mesh filename="meshes/allegro/link_0_0.obj"/>
+       </geometry>
+       <material name="black"/>
+     </visual>
+@@ -365,17 +365,17 @@ and one fixed link will be added for the tip. -->
+                izz="1.01666658333e-06" />
+     </inertial>
+   </link>
+-  <joint name="joint_8.0" type="revolute">
++  <joint name="joint_8_0" type="revolute">
+     <axis xyz="0 0 1"/>
+     <limit effort="0.35" lower="-0.47" upper="0.47" velocity="6.283"/>
+     <parent link="base_link"/>
+-    <child link="link_8.0"/>
++    <child link="link_8_0"/>
+     <origin rpy="0.08726646255 0 0" xyz="0 -0.0435 -0.001542"/>
+   </joint>
+-  <link name="link_9.0">
++  <link name="link_9_0">
+     <visual>
+       <geometry>
+-        <mesh filename="allegro/meshes/allegro/link_1.0.obj"/>
++        <mesh filename="meshes/allegro/link_1_0.obj"/>
+       </geometry>
+       <material name="black"/>
+     </visual>
+@@ -393,17 +393,17 @@ and one fixed link will be added for the tip. -->
+                izz="7.95654166667e-05" />
+     </inertial>
+   </link>
+-  <joint name="joint_9.0" type="revolute">
++  <joint name="joint_9_0" type="revolute">
+     <limit effort="0.35" lower="-0.196" upper="1.61" velocity="6.283"/>
+     <axis xyz="0 1 0"/>
+-    <parent link="link_8.0"/>
+-    <child link="link_9.0"/>
++    <parent link="link_8_0"/>
++    <child link="link_9_0"/>
+     <origin xyz="0 0 0.0164"/>
+   </joint>
+-  <link name="link_10.0">
++  <link name="link_10_0">
+     <visual>
+       <geometry>
+-        <mesh filename="allegro/meshes/allegro/link_2.0.obj"/>
++        <mesh filename="meshes/allegro/link_2_0.obj"/>
+       </geometry>
+       <material name="black"/>
+     </visual>
+@@ -421,17 +421,17 @@ and one fixed link will be added for the tip. -->
+                izz="2.63979183333e-05" />
+     </inertial>
+   </link>
+-  <joint name="joint_10.0" type="revolute">
++  <joint name="joint_10_0" type="revolute">
+     <axis xyz="0 1 0"/>
+     <limit effort="0.35" lower="-0.174" upper="1.709" velocity="6.283"/>
+-    <parent link="link_9.0"/>
+-    <child link="link_10.0"/>
++    <parent link="link_9_0"/>
++    <child link="link_10_0"/>
+     <origin xyz="0 0 0.054"/>
+   </joint>
+-  <link name="link_11.0">
++  <link name="link_11_0">
+     <visual>
+       <geometry>
+-        <mesh filename="allegro/meshes/allegro/link_3.0.obj"/>
++        <mesh filename="meshes/allegro/link_3_0.obj"/>
+       </geometry>
+       <material name="black"/>
+     </visual>
+@@ -453,14 +453,14 @@ and one fixed link will be added for the tip. -->
+                izz="4.701248e-06" />
+     </inertial>
+   </link>
+-  <joint name="joint_11.0" type="revolute">
++  <joint name="joint_11_0" type="revolute">
+     <axis xyz="0 1 0"/>
+     <limit effort="0.35" lower="-0.227" upper="1.618" velocity="6.283"/>
+-    <parent link="link_10.0"/>
+-    <child link="link_11.0"/>
++    <parent link="link_10_0"/>
++    <child link="link_11_0"/>
+     <origin xyz="0 0 0.0384"/>
+   </joint>
+-  <link name="link_11.0_tip">
++  <link name="link_11_0_tip">
+     <visual>
+       <geometry>
+         <sphere radius="0.01235"/>
+@@ -486,17 +486,17 @@ and one fixed link will be added for the tip. -->
+                izz="9.68e-07" />
+      </inertial>
+   </link>
+-  <joint name="joint_11.0_tip" type="fixed">
+-    <parent link="link_11.0"/>
+-    <child link="link_11.0_tip"/>
++  <joint name="joint_11_0_tip" type="fixed">
++    <parent link="link_11_0"/>
++    <child link="link_11_0_tip"/>
+     <origin rpy="0 0 0" xyz="0 0 0.0147"/>
+   </joint>
+   <!-- THUMB -->
+-  <link name="link_12.0">
++  <link name="link_12_0">
+     <visual>
+       <geometry>
+         <!-- RIGHT -->
+-        <mesh filename="allegro/meshes/allegro/link_12.0_right.obj"/>
++        <mesh filename="meshes/allegro/link_12_0_right.obj"/>
+         <!-- LEFT -->
+         <!-- <mesh filename="package://allegro_hand_description/meshes/link_12.0_left.STL" /> -->
+       </geometry>
+@@ -522,17 +522,17 @@ and one fixed link will be added for the tip. -->
+                izz="1.89273333333e-05" />
+     </inertial>
+   </link>
+-  <joint name="joint_12.0" type="revolute">
++  <joint name="joint_12_0" type="revolute">
+     <axis xyz="-1 0 0"/>
+     <limit effort="0.35" lower="0.263" upper="1.396" velocity="6.283"/>
+     <parent link="base_link"/>
+-    <child link="link_12.0"/>
++    <child link="link_12_0"/>
+     <origin rpy="0 -1.65806278845 -1.5707963259" xyz="-0.0182 0.019333 -0.045987"/>
+   </joint>
+-  <link name="link_13.0">
++  <link name="link_13_0">
+     <visual>
+       <geometry>
+-        <mesh filename="allegro/meshes/allegro/link_13.0.obj"/>
++        <mesh filename="meshes/allegro/link_13_0.obj"/>
+       </geometry>
+       <material name="black">
+         <color rgba=".2 .2 .2 1"/>
+@@ -552,20 +552,20 @@ and one fixed link will be added for the tip. -->
+                izz="4.24250866667e-06" />
+     </inertial>
+   </link>
+-  <joint name="joint_13.0" type="revolute">
++  <joint name="joint_13_0" type="revolute">
+     <axis xyz="0 0 1"/>
+     <limit effort="0.35" lower="-0.105" upper="1.163" velocity="6.283"/>
+-    <parent link="link_12.0"/>
+-    <child link="link_13.0"/>
++    <parent link="link_12_0"/>
++    <child link="link_13_0"/>
+     <!-- RIGHT -->
+     <origin xyz="-0.027 0.005 0.0399"/>
+     <!-- LEFT -->
+     <!-- <origin xyz="-0.027 -0.005 0.0399"/> -->
+   </joint>
+-  <link name="link_14.0">
++  <link name="link_14_0">
+     <visual>
+       <geometry>
+-        <mesh filename="allegro/meshes/allegro/link_14.0.obj"/>
++        <mesh filename="meshes/allegro/link_14_0.obj"/>
+       </geometry>
+       <material name="black">
+       </material>
+@@ -583,17 +583,17 @@ and one fixed link will be added for the tip. -->
+                iyz="1.342825e-05" izz="4.30439933333e-05" />
+     </inertial>
+   </link>
+-  <joint name="joint_14.0" type="revolute">
++  <joint name="joint_14_0" type="revolute">
+     <axis xyz="0 1 0"/>
+     <limit effort="0.35" lower="-0.189" upper="1.644" velocity="6.283"/>
+-    <parent link="link_13.0"/>
+-    <child link="link_14.0"/>
++    <parent link="link_13_0"/>
++    <child link="link_14_0"/>
+     <origin xyz="0 0 0.0177"/>
+   </joint>
+-  <link name="link_15.0">
++  <link name="link_15_0">
+     <visual>
+       <geometry>
+-        <mesh filename="allegro/meshes/allegro/link_15.0.obj"/>
++        <mesh filename="meshes/allegro/link_15_0.obj"/>
+       </geometry>
+       <material name="black">
+     	</material>
+@@ -617,14 +617,14 @@ and one fixed link will be added for the tip. -->
+                izz="3.29223173333e-05" />
+     </inertial>
+   </link>
+-  <joint name="joint_15.0" type="revolute">
++  <joint name="joint_15_0" type="revolute">
+     <axis xyz="0 1 0"/>
+     <limit effort="0.35" lower="-0.162" upper="1.719" velocity="6.283"/>
+-    <parent link="link_14.0"/>
+-    <child link="link_15.0"/>
++    <parent link="link_14_0"/>
++    <child link="link_15_0"/>
+     <origin xyz="0 0 0.0514"/>
+   </joint>
+-  <link name="link_15.0_tip">
++  <link name="link_15_0_tip">
+     <visual>
+       <geometry>
+         <sphere radius="0.01235"/>
+@@ -650,9 +650,9 @@ and one fixed link will be added for the tip. -->
+                izz="9.68e-07" />
+      </inertial>
+   </link>
+-  <joint name="joint_15.0_tip" type="fixed">
+-    <parent link="link_15.0"/>
+-    <child link="link_15.0_tip"/>
++  <joint name="joint_15_0_tip" type="fixed">
++    <parent link="link_15_0"/>
++    <child link="link_15_0_tip"/>
+     <origin rpy="0 0 0" xyz="0 0 0.0303"/>
+     <!--0.0267000000000005-->
+   </joint>
+diff --git a/assets/allegro/allegro_left.urdf b/assets/allegro/allegro_left.urdf
+index 26e4f01..67b727a 100644
+--- a/assets/allegro/allegro_left.urdf
++++ b/assets/allegro/allegro_left.urdf
+@@ -20,10 +20,10 @@
+       </geometry>
+     </collision>
+   </link>
+-  <link name="link_0.0">
++  <link name="link_0_0">
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_0.0.obj"/>
++        <mesh filename="meshes/allegro/link_0_0.obj"/>
+       </geometry>
+     </visual>
+     <collision>
+@@ -38,14 +38,14 @@
+       <inertia ixx="1.01666658333e-06" ixy="0.0" ixz="0.0" iyy="6.47677333333e-07" iyz="0.0" izz="1.01666658333e-06"/>
+     </inertial>
+   </link>
+-  <joint name="joint_0.0" type="revolute">
++  <joint name="joint_0_0" type="revolute">
+     <axis xyz="0 0 1"/>
+     <limit effort="10" lower="-0.47" upper="0.47" velocity="3.14"/>
+     <parent link="base_link"/>
+-    <child link="link_0.0"/>
++    <child link="link_0_0"/>
+     <origin rpy="-0.08726646255 0 0" xyz="0 0.0435 -0.001542"/>
+   </joint>
+-  <link name="link_1.0">
++  <link name="link_1_0">
+     <inertial>
+       <mass value="0.065"/>
+       <origin xyz="0 0 0" rpy="0 0 0"/>
+@@ -53,7 +53,7 @@
+     </inertial>
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_1.0.obj"/>
++        <mesh filename="meshes/allegro/link_1_0.obj"/>
+       </geometry>
+     </visual>
+     <collision>
+@@ -63,14 +63,14 @@
+       <origin rpy="0 0 0" xyz="0 0 0.027"/>
+     </collision>
+   </link>
+-  <joint name="joint_1.0" type="revolute">
++  <joint name="joint_1_0" type="revolute">
+     <limit effort="10" lower="-0.196" upper="1.61" velocity="3.14"/>
+     <axis xyz="0 1 0"/>
+-    <parent link="link_0.0"/>
+-    <child link="link_1.0"/>
++    <parent link="link_0_0"/>
++    <child link="link_1_0"/>
+     <origin xyz="0 0 0.0164"/>
+   </joint>
+-  <link name="link_2.0">
++  <link name="link_2_0">
+     <inertial>
+       <mass value="0.0355"/>
+       <origin xyz="0 0 0" rpy="0 0 0"/>
+@@ -78,7 +78,7 @@
+     </inertial>
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_2.0.obj"/>
++        <mesh filename="meshes/allegro/link_2_0.obj"/>
+       </geometry>
+     </visual>
+     <collision>
+@@ -88,17 +88,17 @@
+       <origin rpy="0 0 0" xyz="0 0 0.0192"/>
+     </collision>
+   </link>
+-  <joint name="joint_2.0" type="revolute">
++  <joint name="joint_2_0" type="revolute">
+     <axis xyz="0 1 0"/>
+     <limit effort="10" lower="-0.174" upper="1.709" velocity="3.14"/>
+-    <parent link="link_1.0"/>
+-    <child link="link_2.0"/>
++    <parent link="link_1_0"/>
++    <child link="link_2_0"/>
+     <origin xyz="0 0 0.054"/>
+   </joint>
+-  <link name="link_3.0">
++  <link name="link_3_0">
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_3.0.obj"/>
++        <mesh filename="meshes/allegro/link_3_0.obj"/>
+       </geometry>
+     </visual>
+     <collision>
+@@ -115,17 +115,17 @@
+                izz="4.701248e-06" />
+     </inertial>
+   </link>
+-  <joint name="joint_3.0" type="revolute">
++  <joint name="joint_3_0" type="revolute">
+     <axis xyz="0 1 0"/>
+     <limit effort="10" lower="-0.227" upper="1.618" velocity="3.14"/>
+-    <parent link="link_2.0"/>
+-    <child link="link_3.0"/>
++    <parent link="link_2_0"/>
++    <child link="link_3_0"/>
+     <origin xyz="0 0 0.0384"/>
+   </joint>
+-  <link name="link_3.0_tip">
++  <link name="link_3_0_tip">
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_3.0_tip.obj"/>
++        <mesh filename="meshes/allegro/link_3_0_tip.obj"/>
+       </geometry>
+       <material name="white">
+         <color rgba=".9 .9 .9 1"/>
+@@ -142,12 +142,12 @@
+       <inertia ixx="9.68e-07" ixy="0" ixz="0" iyy="9.68e-07" iyz="0" izz="9.68e-07"/>
+     </inertial>
+   </link>
+-  <joint name="joint_3.0_tip" type="fixed">
+-    <parent link="link_3.0"/>
+-    <child link="link_3.0_tip"/>
++  <joint name="joint_3_0_tip" type="fixed">
++    <parent link="link_3_0"/>
++    <child link="link_3_0_tip"/>
+     <origin rpy="0 0 0" xyz="0 0 0.0267"/>
+   </joint>
+-  <link name="link_4.0">
++  <link name="link_4_0">
+     <inertial>
+       <mass value="0.005"/>
+       <origin xyz="0 0 0"/>
+@@ -155,7 +155,7 @@
+     </inertial>
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_0.0.obj"/>
++        <mesh filename="meshes/allegro/link_0_0.obj"/>
+       </geometry>
+     </visual>
+     <collision>
+@@ -165,14 +165,14 @@
+       <origin rpy="0 0 0" xyz="0 0 0.0082"/>
+     </collision>
+   </link>
+-  <joint name="joint_4.0" type="revolute">
++  <joint name="joint_4_0" type="revolute">
+     <axis xyz="0 0 1"/>
+     <limit effort="10" lower="-0.47" upper="0.47" velocity="3.14"/>
+     <parent link="base_link"/>
+-    <child link="link_4.0"/>
++    <child link="link_4_0"/>
+     <origin rpy="0.0 0 0" xyz="0 0 0.0007"/>
+   </joint>
+-  <link name="link_5.0">
++  <link name="link_5_0">
+     <inertial>
+       <mass value="0.065"/>
+       <origin xyz="0 0 0" rpy="0 0 0"/>
+@@ -180,7 +180,7 @@
+     </inertial>
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_1.0.obj"/>
++        <mesh filename="meshes/allegro/link_1_0.obj"/>
+       </geometry>
+     </visual>
+     <collision>
+@@ -190,14 +190,14 @@
+       <origin rpy="0 0 0" xyz="0 0 0.027"/>
+     </collision>
+   </link>
+-  <joint name="joint_5.0" type="revolute">
++  <joint name="joint_5_0" type="revolute">
+     <limit effort="10" lower="-0.196" upper="1.61" velocity="3.14"/>
+     <axis xyz="0 1 0"/>
+-    <parent link="link_4.0"/>
+-    <child link="link_5.0"/>
++    <parent link="link_4_0"/>
++    <child link="link_5_0"/>
+     <origin xyz="0 0 0.0164"/>
+   </joint>
+-  <link name="link_6.0">
++  <link name="link_6_0">
+     <inertial>
+       <mass value="0.0355"/>
+       <origin xyz="0 0 0" rpy="0 0 0"/>
+@@ -205,7 +205,7 @@
+     </inertial>
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_2.0.obj"/>
++        <mesh filename="meshes/allegro/link_2_0.obj"/>
+       </geometry>
+     </visual>
+     <collision>
+@@ -215,17 +215,17 @@
+       <origin rpy="0 0 0" xyz="0 0 0.0192"/>
+     </collision>
+   </link>
+-  <joint name="joint_6.0" type="revolute">
++  <joint name="joint_6_0" type="revolute">
+     <axis xyz="0 1 0"/>
+     <limit effort="10" lower="-0.174" upper="1.709" velocity="3.14"/>
+-    <parent link="link_5.0"/>
+-    <child link="link_6.0"/>
++    <parent link="link_5_0"/>
++    <child link="link_6_0"/>
+     <origin xyz="0 0 0.054"/>
+   </joint>
+-  <link name="link_7.0">
++  <link name="link_7_0">
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_3.0.obj"/>
++        <mesh filename="meshes/allegro/link_3_0.obj"/>
+       </geometry>
+       <material name="black"/>
+     </visual>
+@@ -243,17 +243,17 @@
+                izz="4.701248e-06" />
+     </inertial>
+   </link>
+-  <joint name="joint_7.0" type="revolute">
++  <joint name="joint_7_0" type="revolute">
+     <axis xyz="0 1 0"/>
+     <limit effort="10" lower="-0.227" upper="1.618" velocity="3.14"/>
+-    <parent link="link_6.0"/>
+-    <child link="link_7.0"/>
++    <parent link="link_6_0"/>
++    <child link="link_7_0"/>
+     <origin xyz="0 0 0.0384"/>
+   </joint>
+-  <link name="link_7.0_tip">
++  <link name="link_7_0_tip">
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_3.0_tip.obj"/>
++        <mesh filename="meshes/allegro/link_3_0_tip.obj"/>
+       </geometry>
+       <material name="white">
+         <color rgba=".9 .9 .9 1"/>
+@@ -272,12 +272,12 @@
+                izz="9.68e-07" />
+      </inertial>
+   </link>
+-  <joint name="joint_7.0_tip" type="fixed">
+-    <parent link="link_7.0"/>
+-    <child link="link_7.0_tip"/>
++  <joint name="joint_7_0_tip" type="fixed">
++    <parent link="link_7_0"/>
++    <child link="link_7_0_tip"/>
+     <origin rpy="0 0 0" xyz="0 0 0.0267"/>
+   </joint>
+-  <link name="link_8.0">
++  <link name="link_8_0">
+     <inertial>
+       <mass value="0.005"/>
+       <origin xyz="0 0 0"/>
+@@ -285,7 +285,7 @@
+     </inertial>
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_0.0.obj"/>
++        <mesh filename="meshes/allegro/link_0_0.obj"/>
+       </geometry>
+     </visual>
+     <collision>
+@@ -295,14 +295,14 @@
+       <origin rpy="0 0 0" xyz="0 0 0.0082"/>
+     </collision>
+   </link>
+-  <joint name="joint_8.0" type="revolute">
++  <joint name="joint_8_0" type="revolute">
+     <axis xyz="0 0 1"/>
+     <limit effort="10" lower="-0.47" upper="0.47" velocity="3.14"/>
+     <parent link="base_link"/>
+-    <child link="link_8.0"/>
++    <child link="link_8_0"/>
+     <origin rpy="0.08726646255 0 0" xyz="0 -0.0435 -0.001542"/>
+   </joint>
+-  <link name="link_9.0">
++  <link name="link_9_0">
+     <inertial>
+       <mass value="0.065"/>
+       <origin xyz="0 0 0" rpy="0 0 0"/>
+@@ -310,7 +310,7 @@
+     </inertial>
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_1.0.obj"/>
++        <mesh filename="meshes/allegro/link_1_0.obj"/>
+       </geometry>
+     </visual>
+     <collision>
+@@ -320,14 +320,14 @@
+       <origin rpy="0 0 0" xyz="0 0 0.027"/>
+     </collision>
+   </link>
+-  <joint name="joint_9.0" type="revolute">
++  <joint name="joint_9_0" type="revolute">
+     <limit effort="10" lower="-0.196" upper="1.61" velocity="3.14"/>
+     <axis xyz="0 1 0"/>
+-    <parent link="link_8.0"/>
+-    <child link="link_9.0"/>
++    <parent link="link_8_0"/>
++    <child link="link_9_0"/>
+     <origin xyz="0 0 0.0164"/>
+   </joint>
+-  <link name="link_10.0">
++  <link name="link_10_0">
+     <inertial>
+       <mass value="0.0355"/>
+       <origin xyz="0 0 0" rpy="0 0 0"/>
+@@ -335,7 +335,7 @@
+     </inertial>
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_2.0.obj"/>
++        <mesh filename="meshes/allegro/link_2_0.obj"/>
+       </geometry>
+     </visual>
+     <collision>
+@@ -345,17 +345,17 @@
+       <origin rpy="0 0 0" xyz="0 0 0.0192"/>
+     </collision>
+   </link>
+-  <joint name="joint_10.0" type="revolute">
++  <joint name="joint_10_0" type="revolute">
+     <axis xyz="0 1 0"/>
+     <limit effort="10" lower="-0.174" upper="1.709" velocity="3.14"/>
+-    <parent link="link_9.0"/>
+-    <child link="link_10.0"/>
++    <parent link="link_9_0"/>
++    <child link="link_10_0"/>
+     <origin xyz="0 0 0.054"/>
+   </joint>
+-  <link name="link_11.0">
++  <link name="link_11_0">
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_3.0.obj"/>
++        <mesh filename="meshes/allegro/link_3_0.obj"/>
+       </geometry>
+       <material name="black"/>
+     </visual>
+@@ -373,17 +373,17 @@
+                izz="4.701248e-06" />
+     </inertial>
+   </link>
+-  <joint name="joint_11.0" type="revolute">
++  <joint name="joint_11_0" type="revolute">
+     <axis xyz="0 1 0"/>
+     <limit effort="10" lower="-0.227" upper="1.618" velocity="3.14"/>
+-    <parent link="link_10.0"/>
+-    <child link="link_11.0"/>
++    <parent link="link_10_0"/>
++    <child link="link_11_0"/>
+     <origin xyz="0 0 0.0384"/>
+   </joint>
+-  <link name="link_11.0_tip">
++  <link name="link_11_0_tip">
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_3.0_tip.obj"/>
++        <mesh filename="meshes/allegro/link_3_0_tip.obj"/>
+       </geometry>
+       <material name="white">
+         <color rgba=".9 .9 .9 1"/>
+@@ -402,12 +402,12 @@
+                izz="9.68e-07" />
+      </inertial>
+   </link>
+-  <joint name="joint_11.0_tip" type="fixed">
+-    <parent link="link_11.0"/>
+-    <child link="link_11.0_tip"/>
++  <joint name="joint_11_0_tip" type="fixed">
++    <parent link="link_11_0"/>
++    <child link="link_11_0_tip"/>
+     <origin rpy="0 0 0" xyz="0 0 0.0267"/>
+   </joint> <!-- THUMB -->
+-  <link name="link_12.0">
++  <link name="link_12_0">
+     <inertial>
+       <mass value="0.0176"/>
+       <origin xyz="0 0 0" rpy="0 0 0"/>
+@@ -415,7 +415,7 @@
+     </inertial>
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_12.0_left.obj"/>
++        <mesh filename="meshes/allegro/link_12_0_left.obj"/>
+       </geometry>
+       <origin rpy="3.14159 0 0" xyz="0 0 0"/>
+     </visual>
+@@ -426,14 +426,14 @@
+       <origin rpy="0 0 0" xyz="-0.0179 0.009 0.0145"/>
+     </collision>
+   </link>
+-  <joint name="joint_12.0" type="revolute">
++  <joint name="joint_12_0" type="revolute">
+     <axis xyz="1 0 0"/>
+     <limit effort="10" lower="0.263" upper="1.396" velocity="3.14"/>
+     <parent link="base_link"/>
+-    <child link="link_12.0"/>
++    <child link="link_12_0"/>
+     <origin xyz="-0.0182 -0.019333 -0.045987" rpy="0 -1.65806278845 1.5707963259"/>
+   </joint>
+-  <link name="link_13.0">
++  <link name="link_13_0">
+     <inertial>
+       <mass value="0.0119"/>
+       <origin xyz="0 0 0" rpy="0 0 0"/>
+@@ -441,7 +441,7 @@
+     </inertial>
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_13.0.obj"/>
++        <mesh filename="meshes/allegro/link_13_0.obj"/>
+       </geometry>
+     </visual>
+     <collision>
+@@ -451,14 +451,14 @@
+       <origin rpy="0 0 0" xyz="0 0 0.00885"/>
+     </collision>
+   </link>
+-  <joint name="joint_13.0" type="revolute">
++  <joint name="joint_13_0" type="revolute">
+     <axis xyz="0 0 -1"/>
+     <limit effort="10" lower="-0.105" upper="1.163" velocity="3.14"/>
+-    <parent link="link_12.0"/>
+-    <child link="link_13.0"/>
++    <parent link="link_12_0"/>
++    <child link="link_13_0"/>
+     <origin xyz="-0.027 0.005 0.0399"/>
+   </joint>
+-  <link name="link_14.0">
++  <link name="link_14_0">
+     <inertial>
+       <mass value="0.038"/>
+       <origin xyz="0 0 0" rpy="0 0 0"/>
+@@ -466,7 +466,7 @@
+     </inertial>
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_14.0.obj"/>
++        <mesh filename="meshes/allegro/link_14_0.obj"/>
+       </geometry>
+     </visual>
+     <collision>
+@@ -476,17 +476,17 @@
+       <origin rpy="0 0 0" xyz="0 0 0.0257"/>
+     </collision>
+   </link>
+-  <joint name="joint_14.0" type="revolute">
++  <joint name="joint_14_0" type="revolute">
+     <axis xyz="0 1 0"/>
+     <limit effort="10" lower="-0.189" upper="1.644" velocity="3.14"/>
+-    <parent link="link_13.0"/>
+-    <child link="link_14.0"/>
++    <parent link="link_13_0"/>
++    <child link="link_14_0"/>
+     <origin xyz="0 0 0.0177"/>
+   </joint>
+-  <link name="link_15.0">
++  <link name="link_15_0">
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_15.0.obj"/>
++        <mesh filename="meshes/allegro/link_15_0.obj"/>
+       </geometry>
+       <material name="black">
+       </material>
+@@ -505,17 +505,17 @@
+                izz="3.29223173333e-05" />
+     </inertial>
+   </link>
+-  <joint name="joint_15.0" type="revolute">
++  <joint name="joint_15_0" type="revolute">
+     <axis xyz="0 1 0"/>
+     <limit effort="10" lower="-0.162" upper="1.719" velocity="3.14"/>
+-    <parent link="link_14.0"/>
+-    <child link="link_15.0"/>
++    <parent link="link_14_0"/>
++    <child link="link_15_0"/>
+     <origin xyz="0 0 0.0514"/>
+   </joint>
+-  <link name="link_15.0_tip">
++  <link name="link_15_0_tip">
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_15.0_tip.obj"/>
++        <mesh filename="meshes/allegro/link_15_0_tip.obj"/>
+       </geometry>
+       <material name="white">
+         <color rgba=".9 .9 .9 1"/>
+@@ -533,9 +533,9 @@
+       <inertia ixx="9.68e-07" ixy="0" ixz="0" iyy="9.68e-07" iyz="0" izz="9.68e-07"/>
+     </inertial>
+   </link>
+-  <joint name="joint_15.0_tip" type="fixed">
+-    <parent link="link_15.0"/>
+-    <child link="link_15.0_tip"/>
++  <joint name="joint_15_0_tip" type="fixed">
++    <parent link="link_15_0"/>
++    <child link="link_15_0_tip"/>
+     <origin rpy="0 0 0" xyz="0 0 0.0423"/>
+   </joint>
+ </robot>
+diff --git a/assets/allegro/allegro_right.urdf b/assets/allegro/allegro_right.urdf
+index df72cc1..c84e28c 100644
+--- a/assets/allegro/allegro_right.urdf
++++ b/assets/allegro/allegro_right.urdf
+@@ -27,10 +27,10 @@
+   <!-- FINGERS -->
+   <!-- RIGHT HAND due to which finger is number 0 -->
+   <!-- for LEFT HAND switch the sign of the **offset_origin_y** and **finger_angle_r** parameters-->
+-  <link name="link_0.0">
++  <link name="link_0_0">
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_0.0.obj"/>
++        <mesh filename="meshes/allegro/link_0_0.obj"/>
+       </geometry>
+       <material name="black"/>
+     </visual>
+@@ -48,17 +48,17 @@
+                izz="1.01666658333e-06" />
+     </inertial>
+   </link>
+-  <joint name="joint_0.0" type="revolute">
++  <joint name="joint_0_0" type="revolute">
+     <axis xyz="0 0 1"/>
+     <limit effort="0.35" lower="-0.47" upper="0.47" velocity="6.283"/>
+     <parent link="base_link"/>
+-    <child link="link_0.0"/>
++    <child link="link_0_0"/>
+     <origin rpy="-0.08726646255 0 0" xyz="0 0.0435 -0.001542"/>
+   </joint>
+-  <link name="link_1.0">
++  <link name="link_1_0">
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_1.0.obj"/>
++        <mesh filename="meshes/allegro/link_1_0.obj"/>
+       </geometry>
+       <material name="black"/>
+     </visual>
+@@ -76,17 +76,17 @@
+                izz="7.95654166667e-05" />
+     </inertial>
+   </link>
+-  <joint name="joint_1.0" type="revolute">
++  <joint name="joint_1_0" type="revolute">
+     <limit effort="0.35" lower="-0.196" upper="1.61" velocity="6.283"/>
+     <axis xyz="0 1 0"/>
+-    <parent link="link_0.0"/>
+-    <child link="link_1.0"/>
++    <parent link="link_0_0"/>
++    <child link="link_1_0"/>
+     <origin xyz="0 0 0.0164"/>
+   </joint>
+-  <link name="link_2.0">
++  <link name="link_2_0">
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_2.0.obj"/>
++        <mesh filename="meshes/allegro/link_2_0.obj"/>
+       </geometry>
+       <material name="black"/>
+     </visual>
+@@ -104,17 +104,17 @@
+                izz="2.63979183333e-05" />
+     </inertial>
+   </link>
+-  <joint name="joint_2.0" type="revolute">
++  <joint name="joint_2_0" type="revolute">
+     <axis xyz="0 1 0"/>
+     <limit effort="0.35" lower="-0.174" upper="1.709" velocity="6.283"/>
+-    <parent link="link_1.0"/>
+-    <child link="link_2.0"/>
++    <parent link="link_1_0"/>
++    <child link="link_2_0"/>
+     <origin xyz="0 0 0.054"/>
+   </joint>
+-  <link name="link_3.0">
++  <link name="link_3_0">
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_3.0.obj"/>
++        <mesh filename="meshes/allegro/link_3_0.obj"/>
+       </geometry>
+       <material name="black"/>
+     </visual>
+@@ -132,17 +132,17 @@
+                izz="4.701248e-06" />
+     </inertial>
+   </link>
+-  <joint name="joint_3.0" type="revolute">
++  <joint name="joint_3_0" type="revolute">
+     <axis xyz="0 1 0"/>
+     <limit effort="0.35" lower="-0.227" upper="1.618" velocity="6.283"/>
+-    <parent link="link_2.0"/>
+-    <child link="link_3.0"/>
++    <parent link="link_2_0"/>
++    <child link="link_3_0"/>
+     <origin xyz="0 0 0.0384"/>
+   </joint>
+-  <link name="link_3.0_tip">
++  <link name="link_3_0_tip">
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_3.0_tip.obj"/>
++        <mesh filename="meshes/allegro/link_3_0_tip.obj"/>
+       </geometry>
+       <material name="white">
+         <color rgba=".9 .9 .9 1"/>
+@@ -159,16 +159,16 @@
+       <inertia ixx="9.68e-07" ixy="0" ixz="0" iyy="9.68e-07" iyz="0" izz="9.68e-07"/>
+     </inertial>
+   </link>
+-  <joint name="joint_3.0_tip" type="fixed">
+-    <parent link="link_3.0"/>
+-    <child link="link_3.0_tip"/>
++  <joint name="joint_3_0_tip" type="fixed">
++    <parent link="link_3_0"/>
++    <child link="link_3_0_tip"/>
+     <origin rpy="0 0 0" xyz="0 0 0.0267"/>
+   </joint>
+   <!-- [LINK 0, 4, 8] -->
+-  <link name="link_4.0">
++  <link name="link_4_0">
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_0.0.obj"/>
++        <mesh filename="meshes/allegro/link_0_0.obj"/>
+       </geometry>
+       <material name="black"/>
+     </visual>
+@@ -186,17 +186,17 @@
+                izz="1.01666658333e-06" />
+     </inertial>
+   </link>
+-  <joint name="joint_4.0" type="revolute">
++  <joint name="joint_4_0" type="revolute">
+     <axis xyz="0 0 1"/>
+     <limit effort="0.35" lower="-0.47" upper="0.47" velocity="6.283"/>
+     <parent link="base_link"/>
+-    <child link="link_4.0"/>
++    <child link="link_4_0"/>
+     <origin rpy="0.0 0 0" xyz="0 0 0.0007"/>
+   </joint>
+-  <link name="link_5.0">
++  <link name="link_5_0">
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_1.0.obj"/>
++        <mesh filename="meshes/allegro/link_1_0.obj"/>
+       </geometry>
+       <material name="black"/>
+     </visual>
+@@ -214,17 +214,17 @@
+                izz="7.95654166667e-05" />
+     </inertial>
+   </link>
+-  <joint name="joint_5.0" type="revolute">
++  <joint name="joint_5_0" type="revolute">
+     <limit effort="0.35" lower="-0.196" upper="1.61" velocity="6.283"/>
+     <axis xyz="0 1 0"/>
+-    <parent link="link_4.0"/>
+-    <child link="link_5.0"/>
++    <parent link="link_4_0"/>
++    <child link="link_5_0"/>
+     <origin xyz="0 0 0.0164"/>
+   </joint>
+-  <link name="link_6.0">
++  <link name="link_6_0">
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_2.0.obj"/>
++        <mesh filename="meshes/allegro/link_2_0.obj"/>
+       </geometry>
+       <material name="black"/>
+     </visual>
+@@ -242,17 +242,17 @@
+                izz="2.63979183333e-05" />
+     </inertial>
+   </link>
+-  <joint name="joint_6.0" type="revolute">
++  <joint name="joint_6_0" type="revolute">
+     <axis xyz="0 1 0"/>
+     <limit effort="0.35" lower="-0.174" upper="1.709" velocity="6.283"/>
+-    <parent link="link_5.0"/>
+-    <child link="link_6.0"/>
++    <parent link="link_5_0"/>
++    <child link="link_6_0"/>
+     <origin xyz="0 0 0.054"/>
+   </joint>
+-  <link name="link_7.0">
++  <link name="link_7_0">
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_3.0.obj"/>
++        <mesh filename="meshes/allegro/link_3_0.obj"/>
+       </geometry>
+       <material name="black"/>
+     </visual>
+@@ -270,17 +270,17 @@
+                izz="4.701248e-06" />
+     </inertial>
+   </link>
+-  <joint name="joint_7.0" type="revolute">
++  <joint name="joint_7_0" type="revolute">
+     <axis xyz="0 1 0"/>
+     <limit effort="0.35" lower="-0.227" upper="1.618" velocity="6.283"/>
+-    <parent link="link_6.0"/>
+-    <child link="link_7.0"/>
++    <parent link="link_6_0"/>
++    <child link="link_7_0"/>
+     <origin xyz="0 0 0.0384"/>
+   </joint>
+-  <link name="link_7.0_tip">
++  <link name="link_7_0_tip">
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_3.0_tip.obj"/>
++        <mesh filename="meshes/allegro/link_3_0_tip.obj"/>
+       </geometry>
+       <material name="white">
+         <color rgba=".9 .9 .9 1"/>
+@@ -299,15 +299,15 @@
+                izz="9.68e-07" />
+      </inertial>
+   </link>
+-  <joint name="joint_7.0_tip" type="fixed">
+-    <parent link="link_7.0"/>
+-    <child link="link_7.0_tip"/>
++  <joint name="joint_7_0_tip" type="fixed">
++    <parent link="link_7_0"/>
++    <child link="link_7_0_tip"/>
+     <origin rpy="0 0 0" xyz="0 0 0.0267"/>
+   </joint>
+-  <link name="link_8.0">
++  <link name="link_8_0">
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_0.0.obj"/>
++        <mesh filename="meshes/allegro/link_0_0.obj"/>
+       </geometry>
+       <material name="black"/>
+     </visual>
+@@ -325,17 +325,17 @@
+                izz="1.01666658333e-06" />
+     </inertial>
+   </link>
+-  <joint name="joint_8.0" type="revolute">
++  <joint name="joint_8_0" type="revolute">
+     <axis xyz="0 0 1"/>
+     <limit effort="0.35" lower="-0.47" upper="0.47" velocity="6.283"/>
+     <parent link="base_link"/>
+-    <child link="link_8.0"/>
++    <child link="link_8_0"/>
+     <origin rpy="0.08726646255 0 0" xyz="0 -0.0435 -0.001542"/>
+   </joint>
+-  <link name="link_9.0">
++  <link name="link_9_0">
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_1.0.obj"/>
++        <mesh filename="meshes/allegro/link_1_0.obj"/>
+       </geometry>
+       <material name="black"/>
+     </visual>
+@@ -353,17 +353,17 @@
+                izz="7.95654166667e-05" />
+     </inertial>
+   </link>
+-  <joint name="joint_9.0" type="revolute">
++  <joint name="joint_9_0" type="revolute">
+     <limit effort="0.35" lower="-0.196" upper="1.61" velocity="6.283"/>
+     <axis xyz="0 1 0"/>
+-    <parent link="link_8.0"/>
+-    <child link="link_9.0"/>
++    <parent link="link_8_0"/>
++    <child link="link_9_0"/>
+     <origin xyz="0 0 0.0164"/>
+   </joint>
+-  <link name="link_10.0">
++  <link name="link_10_0">
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_2.0.obj"/>
++        <mesh filename="meshes/allegro/link_2_0.obj"/>
+       </geometry>
+       <material name="black"/>
+     </visual>
+@@ -381,17 +381,17 @@
+                izz="2.63979183333e-05" />
+     </inertial>
+   </link>
+-  <joint name="joint_10.0" type="revolute">
++  <joint name="joint_10_0" type="revolute">
+     <axis xyz="0 1 0"/>
+     <limit effort="0.35" lower="-0.174" upper="1.709" velocity="6.283"/>
+-    <parent link="link_9.0"/>
+-    <child link="link_10.0"/>
++    <parent link="link_9_0"/>
++    <child link="link_10_0"/>
+     <origin xyz="0 0 0.054"/>
+   </joint>
+-  <link name="link_11.0">
++  <link name="link_11_0">
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_3.0.obj"/>
++        <mesh filename="meshes/allegro/link_3_0.obj"/>
+       </geometry>
+       <material name="black"/>
+     </visual>
+@@ -409,17 +409,17 @@
+                izz="4.701248e-06" />
+     </inertial>
+   </link>
+-  <joint name="joint_11.0" type="revolute">
++  <joint name="joint_11_0" type="revolute">
+     <axis xyz="0 1 0"/>
+     <limit effort="0.35" lower="-0.227" upper="1.618" velocity="6.283"/>
+-    <parent link="link_10.0"/>
+-    <child link="link_11.0"/>
++    <parent link="link_10_0"/>
++    <child link="link_11_0"/>
+     <origin xyz="0 0 0.0384"/>
+   </joint>
+-  <link name="link_11.0_tip">
++  <link name="link_11_0_tip">
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_3.0_tip.obj"/>
++        <mesh filename="meshes/allegro/link_3_0_tip.obj"/>
+       </geometry>
+       <material name="white">
+         <color rgba=".9 .9 .9 1"/>
+@@ -438,17 +438,17 @@
+                izz="9.68e-07" />
+      </inertial>
+   </link>
+-  <joint name="joint_11.0_tip" type="fixed">
+-    <parent link="link_11.0"/>
+-    <child link="link_11.0_tip"/>
++  <joint name="joint_11_0_tip" type="fixed">
++    <parent link="link_11_0"/>
++    <child link="link_11_0_tip"/>
+     <origin rpy="0 0 0" xyz="0 0 0.0267"/>
+   </joint>
+   <!-- THUMB -->
+-  <link name="link_12.0">
++  <link name="link_12_0">
+     <visual>
+       <geometry>
+         <!-- RIGHT -->
+-        <mesh filename="allegro/meshes/allegro/link_12.0_right.obj"/>
++        <mesh filename="meshes/allegro/link_12_0_right.obj"/>
+         <!-- LEFT -->
+         <!-- <mesh filename="package://allegro_hand_description/meshes/link_12.0_left.STL" /> -->
+       </geometry>
+@@ -474,17 +474,17 @@
+                izz="1.89273333333e-05" />
+     </inertial>
+   </link>
+-  <joint name="joint_12.0" type="revolute">
++  <joint name="joint_12_0" type="revolute">
+     <axis xyz="-1 0 0"/>
+     <limit effort="0.35" lower="0.263" upper="1.396" velocity="6.283"/>
+     <parent link="base_link"/>
+-    <child link="link_12.0"/>
++    <child link="link_12_0"/>
+     <origin rpy="0 -1.65806278845 -1.5707963259" xyz="-0.0182 0.019333 -0.045987"/>
+   </joint>
+-  <link name="link_13.0">
++  <link name="link_13_0">
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_13.0.obj"/>
++        <mesh filename="meshes/allegro/link_13_0.obj"/>
+       </geometry>
+       <material name="black">
+         <color rgba=".2 .2 .2 1"/>
+@@ -504,20 +504,20 @@
+                izz="4.24250866667e-06" />
+     </inertial>
+   </link>
+-  <joint name="joint_13.0" type="revolute">
++  <joint name="joint_13_0" type="revolute">
+     <axis xyz="0 0 1"/>
+     <limit effort="0.35" lower="-0.105" upper="1.163" velocity="6.283"/>
+-    <parent link="link_12.0"/>
+-    <child link="link_13.0"/>
++    <parent link="link_12_0"/>
++    <child link="link_13_0"/>
+     <!-- RIGHT -->
+     <origin xyz="-0.027 0.005 0.0399"/>
+     <!-- LEFT -->
+     <!-- <origin xyz="-0.027 -0.005 0.0399"/> -->
+   </joint>
+-  <link name="link_14.0">
++  <link name="link_14_0">
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_14.0.obj"/>
++        <mesh filename="meshes/allegro/link_14_0.obj"/>
+       </geometry>
+       <material name="black">
+       </material>
+@@ -535,17 +535,17 @@
+                iyz="1.342825e-05" izz="4.30439933333e-05" />
+     </inertial>
+   </link>
+-  <joint name="joint_14.0" type="revolute">
++  <joint name="joint_14_0" type="revolute">
+     <axis xyz="0 1 0"/>
+     <limit effort="0.35" lower="-0.189" upper="1.644" velocity="6.283"/>
+-    <parent link="link_13.0"/>
+-    <child link="link_14.0"/>
++    <parent link="link_13_0"/>
++    <child link="link_14_0"/>
+     <origin xyz="0 0 0.0177"/>
+   </joint>
+-  <link name="link_15.0">
++  <link name="link_15_0">
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_15.0.obj"/>
++        <mesh filename="meshes/allegro/link_15_0.obj"/>
+       </geometry>
+       <material name="black">
+       </material>
+@@ -564,17 +564,17 @@
+                izz="3.29223173333e-05" />
+     </inertial>
+   </link>
+-  <joint name="joint_15.0" type="revolute">
++  <joint name="joint_15_0" type="revolute">
+     <axis xyz="0 1 0"/>
+     <limit effort="0.35" lower="-0.162" upper="1.719" velocity="6.283"/>
+-    <parent link="link_14.0"/>
+-    <child link="link_15.0"/>
++    <parent link="link_14_0"/>
++    <child link="link_15_0"/>
+     <origin xyz="0 0 0.0514"/>
+   </joint>
+-  <link name="link_15.0_tip">
++  <link name="link_15_0_tip">
+     <visual>
+       <geometry>
+-        <mesh filename="meshes/allegro/link_15.0_tip.obj"/>
++        <mesh filename="meshes/allegro/link_15_0_tip.obj"/>
+       </geometry>
+       <material name="white">
+         <color rgba=".9 .9 .9 1"/>
+@@ -592,9 +592,9 @@
+       <inertia ixx="9.68e-07" ixy="0" ixz="0" iyy="9.68e-07" iyz="0" izz="9.68e-07"/>
+     </inertial>
+   </link>
+-  <joint name="joint_15.0_tip" type="fixed">
+-    <parent link="link_15.0"/>
+-    <child link="link_15.0_tip"/>
++  <joint name="joint_15_0_tip" type="fixed">
++    <parent link="link_15_0"/>
++    <child link="link_15_0_tip"/>
+     <origin rpy="0 0 0" xyz="0 0 0.0423"/>
+   </joint>
+   <!-- ============================================================================= -->
+diff --git a/assets/allegro/meshes/allegro/link_0.0.obj b/assets/allegro/meshes/allegro/link_0_0.obj
+similarity index 100%
+rename from assets/allegro/meshes/allegro/link_0.0.obj
+rename to assets/allegro/meshes/allegro/link_0_0.obj
+diff --git a/assets/allegro/meshes/allegro/link_12.0_left.obj b/assets/allegro/meshes/allegro/link_12_0_left.obj
+similarity index 100%
+rename from assets/allegro/meshes/allegro/link_12.0_left.obj
+rename to assets/allegro/meshes/allegro/link_12_0_left.obj
+diff --git a/assets/allegro/meshes/allegro/link_12.0_right.obj b/assets/allegro/meshes/allegro/link_12_0_right.obj
+similarity index 100%
+rename from assets/allegro/meshes/allegro/link_12.0_right.obj
+rename to assets/allegro/meshes/allegro/link_12_0_right.obj
+diff --git a/assets/allegro/meshes/allegro/link_13.0.obj b/assets/allegro/meshes/allegro/link_13_0.obj
+similarity index 100%
+rename from assets/allegro/meshes/allegro/link_13.0.obj
+rename to assets/allegro/meshes/allegro/link_13_0.obj
+diff --git a/assets/allegro/meshes/allegro/link_14.0.obj b/assets/allegro/meshes/allegro/link_14_0.obj
+similarity index 100%
+rename from assets/allegro/meshes/allegro/link_14.0.obj
+rename to assets/allegro/meshes/allegro/link_14_0.obj
+diff --git a/assets/allegro/meshes/allegro/link_15.0.obj b/assets/allegro/meshes/allegro/link_15_0.obj
+similarity index 100%
+rename from assets/allegro/meshes/allegro/link_15.0.obj
+rename to assets/allegro/meshes/allegro/link_15_0.obj
+diff --git a/assets/allegro/meshes/allegro/link_15.0_tip.obj b/assets/allegro/meshes/allegro/link_15_0_tip.obj
+similarity index 100%
+rename from assets/allegro/meshes/allegro/link_15.0_tip.obj
+rename to assets/allegro/meshes/allegro/link_15_0_tip.obj
+diff --git a/assets/allegro/meshes/allegro/link_1.0.obj b/assets/allegro/meshes/allegro/link_1_0.obj
+similarity index 100%
+rename from assets/allegro/meshes/allegro/link_1.0.obj
+rename to assets/allegro/meshes/allegro/link_1_0.obj
+diff --git a/assets/allegro/meshes/allegro/link_2.0.obj b/assets/allegro/meshes/allegro/link_2_0.obj
+similarity index 100%
+rename from assets/allegro/meshes/allegro/link_2.0.obj
+rename to assets/allegro/meshes/allegro/link_2_0.obj
+diff --git a/assets/allegro/meshes/allegro/link_3.0.obj b/assets/allegro/meshes/allegro/link_3_0.obj
+similarity index 100%
+rename from assets/allegro/meshes/allegro/link_3.0.obj
+rename to assets/allegro/meshes/allegro/link_3_0.obj
+diff --git a/assets/allegro/meshes/allegro/link_3.0_tip.obj b/assets/allegro/meshes/allegro/link_3_0_tip.obj
+similarity index 100%
+rename from assets/allegro/meshes/allegro/link_3.0_tip.obj
+rename to assets/allegro/meshes/allegro/link_3_0_tip.obj
+diff --git a/gen_grasp.py b/gen_grasp.py
+index 4fe4991..1e41e04 100644
+--- a/gen_grasp.py
++++ b/gen_grasp.py
+@@ -9,47 +9,56 @@
+ # Licence under BSD 3-Clause License
+ # https://github.com/NVIDIA-Omniverse/IsaacGymEnvs/
+ # --------------------------------------------------------
++# Ported from IsaacGym to IsaacLab (2026) -- see train.py for why the
++# `AppLauncher` bootstrap has to run before any `isaaclab`-touching import.
++# --------------------------------------------------------
++
++import sys
++
++from isaaclab.app import AppLauncher
++
++
++def _cli_override(key: str, default: str) -> str:
++    prefix = f"{key}="
++    for arg in sys.argv[1:]:
++        if arg.startswith(prefix):
++            return arg[len(prefix):]
++    return default
+ 
+-import isaacgym
+ 
+-import os
++_headless = _cli_override("headless", "False").lower() == "true"
++_sim_device = _cli_override("sim_device", "cuda:0")
++
++app_launcher = AppLauncher(headless=_headless, device=_sim_device)
++simulation_app = app_launcher.app
++
++# ---- everything below may safely import isaaclab ----
++
+ import hydra
+-import datetime
+-from termcolor import cprint
+ from omegaconf import DictConfig, OmegaConf
+-from hydra.utils import to_absolute_path
+ 
+-from hora.algo.ppo.ppo import PPO
+-from hora.algo.padapt.padapt import ProprioAdapt
+-from hora.tasks import isaacgym_task_map
+-from hora.utils.reformat import omegaconf_to_dict, print_dict
+-from hora.utils.misc import set_np_formatting, set_seed, git_hash, git_diff_config
++from hora.tasks import isaaclab_task_map
++from hora.utils.misc import set_np_formatting, set_seed
+ 
+ 
+-## OmegaConf & Hydra Config
+-# Resolvers used in hydra configs (see https://omegaconf.readthedocs.io/en/2.1_branch/usage.html#resolvers)
++# OmegaConf & Hydra Config
+ OmegaConf.register_new_resolver("eq", lambda x, y: x.lower() == y.lower())
+ OmegaConf.register_new_resolver("contains", lambda x, y: x.lower() in y.lower())
+ OmegaConf.register_new_resolver("if", lambda pred, a, b: a if pred else b)
+ # allows us to resolve default arguments which are copied in multiple places in the config.
+-# used primarily for num_ensv
+-OmegaConf.register_new_resolver("resolve_default", lambda default, arg: default if arg == "" else arg)
++# used primarily for num_envs
++OmegaConf.register_new_resolver(
++    "resolve_default", lambda default, arg: default if arg == "" else arg
++)
+ 
+ 
+ @hydra.main(config_name="config", config_path="configs")
+ def main(config: DictConfig):
+-    if config.checkpoint:
+-        config.checkpoint = to_absolute_path(config.checkpoint)
+-
+-    # set numpy formatting for printing only
+     set_np_formatting()
+-
+-    # sets seed. if seed is -1 will pick a random one
+     config.seed = set_seed(config.seed)
+ 
+-    cprint("Start Building the Environment", "green", attrs=["bold"])
+-    env = isaacgym_task_map[config.task_name](
+-        config=omegaconf_to_dict(config.task),
++    env = isaaclab_task_map[config.task_name](
++        config=config.task,
+         sim_device=config.sim_device,
+         graphics_device_id=config.graphics_device_id,
+         headless=config.headless,
+@@ -63,3 +72,4 @@ def main(config: DictConfig):
+ 
+ if __name__ == "__main__":
+     main()
++    simulation_app.close()
+diff --git a/hora/tasks/__init__.py b/hora/tasks/__init__.py
+index 75dbc36..a58471f 100644
+--- a/hora/tasks/__init__.py
++++ b/hora/tasks/__init__.py
+@@ -1,11 +1,25 @@
+-from hora.tasks.allegro_hand_hora import AllegroHandHora
+-from hora.tasks.allegro_hand_grasp import AllegroHandGrasp
++from hora.tasks.isaaclab.allegro_hand_grasp_env import AllegroHandGraspEnv
++from hora.tasks.isaaclab.allegro_hand_hora_env import AllegroHandHoraEnv, build_hora_env_cfg
++from hora.tasks.isaaclab.wrapper import HoraDirectEnvWrapper
++
++
++def AllegroHandHora(config, sim_device, graphics_device_id, headless):
++    cfg = build_hora_env_cfg(config, sim_device, graphics_device_id, headless)
++    env = AllegroHandHoraEnv(cfg, render_mode=None if headless else "human")
++    return HoraDirectEnvWrapper(env, config)
++
++
++def AllegroHandGrasp(config, sim_device, graphics_device_id, headless):
++    cfg = build_hora_env_cfg(config, sim_device, graphics_device_id, headless)
++    env = AllegroHandGraspEnv(cfg, render_mode=None if headless else "human")
++    return HoraDirectEnvWrapper(env, config)
++
+ 
+ # Mappings from strings to environments
+-# Map task names (strings) to their environment classes.
+-# Multiple task names can point to the same class when the implementation is identical
++# Map task names (strings) to their environment factories.
++# Multiple task names can point to the same factory when the implementation is identical
+ # but differs only in configuration (e.g., left vs. right hand or other config parameters).
+-isaacgym_task_map = {
++isaaclab_task_map = {
+     "AllegroHandHora": AllegroHandHora,           # hora original
+     "AllegroHandGrasp": AllegroHandGrasp,
+     "RightAllegroHandHora": AllegroHandHora,      # allgero v4 right hand
+diff --git a/hora/tasks/allegro_hand_grasp.py b/hora/tasks/allegro_hand_grasp.py
+deleted file mode 100644
+index 24c6120..0000000
+--- a/hora/tasks/allegro_hand_grasp.py
++++ /dev/null
+@@ -1,245 +0,0 @@
+-# --------------------------------------------------------
+-# In-Hand Object Rotation via Rapid Motor Adaptation
+-# https://arxiv.org/abs/2210.04887
+-# Copyright (c) 2022 Haozhi Qi
+-# Licensed under The MIT License [see LICENSE for details]
+-# --------------------------------------------------------
+-# Modified by Wonik Robotics (2025)
+-# Adaptations for Allegro Hand V4 deployment
+-# --------------------------------------------------------
+-
+-import torch
+-import numpy as np
+-from isaacgym import gymtorch
+-from isaacgym.torch_utils import (
+-    torch_rand_float,
+-    quat_from_angle_axis,
+-    quat_mul,
+-    tensor_clamp,
+-    to_torch,
+-)
+-from hora.tasks.allegro_hand_hora import AllegroHandHora
+-
+-
+-class AllegroHandGrasp(AllegroHandHora):
+-    def __init__(self, config, sim_device, graphics_device_id, headless):
+-        super().__init__(
+-            config,
+-            sim_device=sim_device,
+-            graphics_device_id=graphics_device_id,
+-            headless=headless,
+-        )
+-        self.saved_grasping_states = torch.zeros(
+-            (0, 23), dtype=torch.float, device=self.device
+-        )
+-        self.canonical_pose = [
+-            0.082,
+-            1.244,
+-            0.265,
+-            0.298,
+-            1.104,
+-            1.163,
+-            0.953,
+-            -0.138,
+-            0.005,
+-            1.096,
+-            0.080,
+-            0.150,
+-            0.029,
+-            1.337,
+-            0.285,
+-            0.317,
+-        ]
+-        self.x_unit_tensor = to_torch(
+-            [1, 0, 0], dtype=torch.float, device=self.device
+-        ).repeat((self.num_envs, 1))
+-        self.y_unit_tensor = to_torch(
+-            [0, 1, 0], dtype=torch.float, device=self.device
+-        ).repeat((self.num_envs, 1))
+-        self.z_unit_tensor = to_torch(
+-            [0, 0, 1], dtype=torch.float, device=self.device
+-        ).repeat((self.num_envs, 1))
+-
+-    def reset_idx(self, env_ids):
+-        if self.randomize_mass:
+-            lower, upper = self.randomize_mass_lower, self.randomize_mass_upper
+-            for env_id in env_ids:
+-                env = self.envs[env_id]
+-                handle = self.gym.find_actor_handle(env, "object")
+-                prop = self.gym.get_actor_rigid_body_properties(env, handle)
+-                for p in prop:
+-                    p.mass = np.random.uniform(lower, upper)
+-                self.gym.set_actor_rigid_body_properties(env, handle, prop)
+-                self._update_priv_buf(
+-                    env_id=env_id,
+-                    name="obj_mass",
+-                    value=prop[0].mass,
+-                    lower=0,
+-                    upper=0.2,
+-                )
+-        else:
+-            for env_id in env_ids:
+-                env = self.envs[env_id]
+-                handle = self.gym.find_actor_handle(env, "object")
+-                prop = self.gym.get_actor_rigid_body_properties(env, handle)
+-                self._update_priv_buf(
+-                    env_id=env_id,
+-                    name="obj_mass",
+-                    value=prop[0].mass,
+-                    lower=0,
+-                    upper=0.2,
+-                )
+-
+-        if self.randomize_pd_gains:
+-            self.p_gain[env_ids] = torch_rand_float(
+-                self.randomize_p_gain_lower,
+-                self.randomize_p_gain_upper,
+-                (len(env_ids), self.num_actions),
+-                device=self.device,
+-            ).squeeze(1)
+-            self.d_gain[env_ids] = torch_rand_float(
+-                self.randomize_d_gain_lower,
+-                self.randomize_d_gain_upper,
+-                (len(env_ids), self.num_actions),
+-                device=self.device,
+-            ).squeeze(1)
+-
+-        # generate random values
+-        rand_floats = torch_rand_float(
+-            -1.0,
+-            1.0,
+-            (len(env_ids), self.num_allegro_hand_dofs * 2 + 5),
+-            device=self.device,
+-        )
+-
+-        # reset rigid body forces
+-        self.rb_forces[env_ids, :, :] = 0.0
+-        success = self.progress_buf[env_ids] == self.max_episode_length
+-        all_states = torch.cat(
+-            [
+-                self.allegro_hand_dof_pos,
+-                self.root_state_tensor[self.object_indices, :7],
+-            ],
+-            dim=1,
+-        )
+-        self.saved_grasping_states = torch.cat(
+-            [self.saved_grasping_states, all_states[env_ids][success]]
+-        )
+-        print("current cache size:", self.saved_grasping_states.shape[0])
+-        if len(self.saved_grasping_states) >= 5e4:
+-            name = f'cache/{self.grasp_cache_name}_grasp_50k_s{str(self.base_obj_scale).replace(".", "")}.npy'
+-            np.save(name, self.saved_grasping_states[:50000].cpu().numpy())
+-            exit()
+-
+-        # reset object
+-        self.root_state_tensor[self.object_indices[env_ids]] = self.object_init_state[
+-            env_ids
+-        ].clone()
+-        self.root_state_tensor[self.object_indices[env_ids], 0:2] = (
+-            self.object_init_state[env_ids, 0:2]
+-        )
+-        self.root_state_tensor[self.object_indices[env_ids], self.up_axis_idx] = (
+-            self.object_init_state[env_ids, self.up_axis_idx]
+-        )
+-        new_object_rot = randomize_rotation(
+-            rand_floats[:, 3],
+-            rand_floats[:, 4],
+-            self.x_unit_tensor[env_ids],
+-            self.y_unit_tensor[env_ids],
+-        )
+-        new_object_rot[:] = 0
+-        new_object_rot[:, -1] = 1
+-        self.root_state_tensor[self.object_indices[env_ids], 3:7] = new_object_rot
+-        self.root_state_tensor[self.object_indices[env_ids], 7:13] = torch.zeros_like(
+-            self.root_state_tensor[self.object_indices[env_ids], 7:13]
+-        )
+-
+-        object_indices = torch.unique(self.object_indices[env_ids]).to(torch.int32)
+-        self.gym.set_actor_root_state_tensor_indexed(
+-            self.sim,
+-            gymtorch.unwrap_tensor(self.root_state_tensor),
+-            gymtorch.unwrap_tensor(object_indices),
+-            len(object_indices),
+-        )
+-
+-        pos = to_torch(self.canonical_pose, device=self.device)[None].repeat(
+-            len(env_ids), 1
+-        )
+-        pos += 0.25 * rand_floats[:, 5 : 5 + self.num_allegro_hand_dofs]
+-        pos = tensor_clamp(
+-            pos, self.allegro_hand_dof_lower_limits, self.allegro_hand_dof_upper_limits
+-        )
+-
+-        self.allegro_hand_dof_pos[env_ids, :] = pos
+-        self.allegro_hand_dof_vel[env_ids, :] = 0
+-        self.prev_targets[env_ids, : self.num_allegro_hand_dofs] = pos
+-        self.cur_targets[env_ids, : self.num_allegro_hand_dofs] = pos
+-
+-        hand_indices = self.hand_indices[env_ids].to(torch.int32)
+-        if not self.torque_control:
+-            self.gym.set_dof_position_target_tensor_indexed(
+-                self.sim,
+-                gymtorch.unwrap_tensor(self.prev_targets),
+-                gymtorch.unwrap_tensor(hand_indices),
+-                len(env_ids),
+-            )
+-        self.gym.set_dof_state_tensor_indexed(
+-            self.sim,
+-            gymtorch.unwrap_tensor(self.dof_state),
+-            gymtorch.unwrap_tensor(hand_indices),
+-            len(env_ids),
+-        )
+-
+-        self.progress_buf[env_ids] = 0
+-        self.obs_buf[env_ids] = 0
+-        self.rb_forces[env_ids] = 0
+-        self.priv_info_buf[env_ids, 0:3] = 0
+-        self.proprio_hist_buf[env_ids] = 0
+-
+-        self.at_reset_buf[env_ids] = 1
+-
+-    def compute_reward(self, actions):
+-        def list_intersect(li, hash_num):
+-            # 17 is the object index
+-            # 4, 8, 12, 16 are fingertip index
+-            # return number of contact with obj_id
+-            obj_id = 17
+-            query_list = [
+-                obj_id * hash_num + 4,
+-                obj_id * hash_num + 8,
+-                obj_id * hash_num + 12,
+-                obj_id * hash_num + 16,
+-            ]
+-            return len(np.intersect1d(query_list, li))
+-
+-        assert self.device == "cpu"
+-        contacts = [self.gym.get_env_rigid_contacts(env) for env in self.envs]
+-        contact_list = [
+-            list_intersect(np.unique([c[2] * 10000 + c[3] for c in contact]), 10000)
+-            for contact in contacts
+-        ]
+-        contact_condition = to_torch(contact_list, device=self.device)
+-
+-        obj_pos = self.rigid_body_states[:, [-1], :3]
+-        finger_pos = self.rigid_body_states[:, [4, 8, 12, 16], :3]
+-        # the sampled pose need to satisfy (check 1 here):
+-        # 1) all fingertips is nearby objects
+-        cond1 = (torch.sqrt(((obj_pos - finger_pos) ** 2).sum(-1)) < 0.1).all(-1)
+-        # 2) at least two fingers are in contact with object
+-        cond2 = contact_condition >= 2
+-        # 3) object does not fall after a few iterations
+-        # 0.645 for internal allegro
+-        # 0.625 for public allegro
+-        cond3 = torch.greater(obj_pos[:, -1, -1], self.reset_z_threshold)
+-        cond = cond1.float() * cond2.float() * cond3.float()
+-        # reset if any of the above condition does not hold
+-        self.reset_buf[cond < 1] = 1
+-        self.reset_buf[self.progress_buf >= self.max_episode_length] = 1
+-
+-
+-@torch.jit.script
+-def randomize_rotation(rand0, rand1, x_unit_tensor, y_unit_tensor):
+-    return quat_mul(
+-        quat_from_angle_axis(rand0 * np.pi, x_unit_tensor),
+-        quat_from_angle_axis(rand1 * np.pi, y_unit_tensor),
+-    )
+diff --git a/hora/tasks/allegro_hand_hora.py b/hora/tasks/allegro_hand_hora.py
+deleted file mode 100644
+index 3807a79..0000000
+--- a/hora/tasks/allegro_hand_hora.py
++++ /dev/null
+@@ -1,1217 +0,0 @@
+-# --------------------------------------------------------
+-# In-Hand Object Rotation via Rapid Motor Adaptation
+-# https://arxiv.org/abs/2210.04887
+-# Copyright (c) 2022 Haozhi Qi
+-# Licensed under The MIT License [see LICENSE for details]
+-# --------------------------------------------------------
+-# Modified by Wonik Robotics (2025)
+-# Adaptations for Allegro Hand V4 deployment
+-# --------------------------------------------------------
+-
+-import os
+-import torch
+-import numpy as np
+-from isaacgym import gymtorch
+-from isaacgym import gymapi
+-from isaacgym.torch_utils import (
+-    to_torch,
+-    unscale,
+-    quat_apply,
+-    tensor_clamp,
+-    torch_rand_float,
+-    quat_conjugate,
+-    quat_mul,
+-)
+-from glob import glob
+-from hora.utils.misc import tprint
+-from .base.vec_task import VecTask
+-
+-
+-class AllegroHandHora(VecTask):
+-    def __init__(self, config, sim_device, graphics_device_id, headless):
+-        self.config = config
+-        # before calling init in VecTask, need to do
+-        # 1. setup randomization
+-        self._setup_domain_rand_config(config["env"]["randomization"])
+-        # 2. setup privileged information
+-        self._setup_priv_option_config(config["env"]["privInfo"])
+-        # 3. setup object assets
+-        self._setup_object_info(config["env"]["object"])
+-        # 4. setup reward
+-        self._setup_reward_config(config["env"]["reward"])
+-        self.base_obj_scale = config["env"]["baseObjScale"]
+-        self.save_init_pose = config["env"]["genGrasps"]
+-        self.aggregate_mode = self.config["env"]["aggregateMode"]
+-        self.up_axis = "z"
+-        self.reset_z_threshold = self.config["env"]["reset_height_threshold"]
+-        self.grasp_cache_name = self.config["env"]["grasp_cache_name"]
+-        self.evaluate = self.config["on_evaluation"]
+-        self.priv_info_dict = {
+-            "obj_position": (0, 3),
+-            "obj_scale": (3, 4),
+-            "obj_mass": (4, 5),
+-            "obj_friction": (5, 6),
+-            "obj_com": (6, 9),
+-        }
+-
+-        super().__init__(config, sim_device, graphics_device_id, headless)
+-
+-        self.debug_viz = self.config["env"]["enableDebugVis"]
+-        self.max_episode_length = self.config["env"]["episodeLength"]
+-        self.dt = self.sim_params.dt
+-
+-        if self.viewer:
+-            cam_pos = gymapi.Vec3(0.0, 0.4, 1.5)
+-            cam_target = gymapi.Vec3(0.0, 0.0, 0.5)
+-            self.gym.viewer_camera_look_at(self.viewer, None, cam_pos, cam_target)
+-
+-        # get gym GPU state tensors
+-        actor_root_state_tensor = self.gym.acquire_actor_root_state_tensor(self.sim)
+-        dof_state_tensor = self.gym.acquire_dof_state_tensor(self.sim)
+-        rigid_body_tensor = self.gym.acquire_rigid_body_state_tensor(self.sim)
+-        net_contact_forces = self.gym.acquire_net_contact_force_tensor(self.sim)
+-
+-        # create some wrapper tensors for different slices
+-        self.allegro_hand_default_dof_pos = torch.zeros(self.num_allegro_hand_dofs, dtype=torch.float, device=self.device)
+-        self.dof_state = gymtorch.wrap_tensor(dof_state_tensor)
+-        self.contact_forces = gymtorch.wrap_tensor(net_contact_forces).view(self.num_envs, -1, 3)
+-        self.allegro_hand_dof_state = self.dof_state.view(self.num_envs, -1, 2)[:, : self.num_allegro_hand_dofs]
+-        self.allegro_hand_dof_pos = self.allegro_hand_dof_state[..., 0]
+-        self.allegro_hand_dof_vel = self.allegro_hand_dof_state[..., 1]
+-
+-        self.rigid_body_states = gymtorch.wrap_tensor(rigid_body_tensor).view(self.num_envs, -1, 13)
+-        self.num_bodies = self.rigid_body_states.shape[1]
+-
+-        self.root_state_tensor = gymtorch.wrap_tensor(actor_root_state_tensor).view(-1, 13)
+-
+-        self._refresh_gym()
+-
+-        self.num_dofs = self.gym.get_sim_dof_count(self.sim) // self.num_envs
+-
+-        self.prev_targets = torch.zeros((self.num_envs, self.num_dofs), dtype=torch.float, device=self.device)
+-        self.cur_targets = torch.zeros((self.num_envs, self.num_dofs), dtype=torch.float, device=self.device)
+-        # object apply random forces parameters
+-        self.force_scale = self.config["env"].get("forceScale", 0.0)
+-        self.random_force_prob_scalar = self.config["env"].get("randomForceProbScalar", 0.0)
+-        self.force_decay = self.config["env"].get("forceDecay", 0.99)
+-        self.force_decay_interval = self.config["env"].get("forceDecayInterval", 0.08)
+-        self.force_decay = to_torch(self.force_decay, dtype=torch.float, device=self.device)
+-        self.rb_forces = torch.zeros((self.num_envs, self.num_bodies, 3), dtype=torch.float, device=self.device)
+-
+-        if self.randomize_scale and self.scale_list_init:
+-            self.saved_grasping_states = {}
+-            for s in self.randomize_scale_list:
+-                self.saved_grasping_states[str(s)] = (torch.from_numpy(
+-                        np.load(f'cache/{self.grasp_cache_name}_grasp_50k_s{str(s).replace(".", "")}.npy')
+-                    ).float().to(self.device))
+-        else:
+-            assert self.save_init_pose
+-
+-        self.rot_axis_buf = torch.zeros((self.num_envs, 3), device=self.device, dtype=torch.float)
+-
+-        # useful buffers
+-        self.object_rot_prev = self.object_rot.clone()
+-        self.object_pos_prev = self.object_pos.clone()
+-        self.init_pose_buf = torch.zeros((self.num_envs, self.num_dofs), device=self.device, dtype=torch.float)
+-        self.actions = torch.zeros((self.num_envs, self.num_actions), device=self.device, dtype=torch.float)
+-        self.torques = torch.zeros((self.num_envs, self.num_actions), device=self.device, dtype=torch.float)
+-        self.dof_vel_finite_diff = torch.zeros((self.num_envs, self.num_dofs), device=self.device, dtype=torch.float)
+-
+-        assert type(self.p_gain) in [int, float] and type(self.d_gain) in [int,float,], "assume p_gain and d_gain are only scalars"
+-        self.p_gain = (torch.ones((self.num_envs, self.num_actions), device=self.device, dtype=torch.float)* self.p_gain)
+-        self.d_gain = (torch.ones((self.num_envs, self.num_actions), device=self.device, dtype=torch.float)* self.d_gain)
+-
+-        # debug and understanding statistics
+-        self.env_timeout_counter = (to_torch(np.zeros((len(self.envs)))).long().to(self.device))  # max 10 (10000 envs)
+-        self.stat_sum_rewards = 0
+-        self.stat_sum_rotate_rewards = 0
+-        self.stat_sum_episode_length = 0
+-        self.stat_sum_obj_linvel = 0
+-        self.stat_sum_torques = 0
+-        self.env_evaluated = 0
+-        self.max_evaluate_envs = 500000
+-
+-
+-        # ================== debug action plotting ==================
+-        self.debug_plots = self.config["env"].get("enableDebugPlots", False)
+-        self.action_recording = self.config["env"].get("enableActionRecording", False)
+-
+-        # Debug output directory
+-        self.debug_dir = "debug"
+-        if self.debug_plots or self.action_recording:
+-            os.makedirs(self.debug_dir, exist_ok=True)
+-
+-        self.debug_hist_len = 500
+-        self._dbg_step = 0
+-        self._action_saved = False ######## action save flag
+-        self._dbg_fig = None
+-        self._dbg_axes = None     # list of 4 axes
+-        self._dbg_lines = None    # dict: {dof_i: (l_act, l_prev, l_tgt, l_cur)}
+-
+-        # Infer Allegro DOF count (e.g., 16 or 32)
+-        dof = int(self.allegro_hand_dof_lower_limits.shape[-1])
+-
+-        # History buffer: (hist_len, dof)
+-        self._hist_actions     = np.zeros((self.debug_hist_len, dof), dtype=np.float32)
+-        self._hist_prev_target = np.zeros((self.debug_hist_len, dof), dtype=np.float32)
+-        self._hist_target_raw  = np.zeros((self.debug_hist_len, dof), dtype=np.float32)
+-        self._hist_cur_target  = np.zeros((self.debug_hist_len, dof), dtype=np.float32)
+-
+-        # Option: cur vs tgt comparison sensitivity (absolute error)
+-        self.debug_atol = 1e-6         # If exactly the same (no clamp), hide cur
+-        self.debug_compare_latest = False  # True to compare only the latest sample (last point), False to compare the entire history
+-
+-
+-        # Visualization target dof indices (fixed: 0,1,2,3)
+-        self._plot_dofs = list(range(16)) # [3, 7, 11, 15] #  [0, 4, 8, 12]
+-
+-        # After inferring Allegro DOF count, add/modify debug_* settings below
+-        self.err_hist_len_mult = 6
+-        self._err_hist_len = self.debug_hist_len * self.err_hist_len_mult
+-
+-        # Error buffer is 6 times longer
+-        self._hist_pos_error = np.zeros((self._err_hist_len, self.allegro_hand_dof_lower_limits.shape[-1]), dtype=np.float32)
+-
+-        # Dedicated error plot handles
+-        self._err_fig = None
+-        self._err_axes = None
+-        self._err_lines = None  # {dof_i: line}
+-
+-
+-    def _create_envs(self, num_envs, spacing, num_per_row):
+-        self._create_ground_plane()
+-        lower = gymapi.Vec3(-spacing, -spacing, 0.0)
+-        upper = gymapi.Vec3(spacing, spacing, spacing)
+-
+-        self._create_object_asset()
+-
+-        # set allegro_hand dof properties
+-        self.num_allegro_hand_dofs = self.gym.get_asset_dof_count(self.hand_asset)
+-        allegro_hand_dof_props = self.gym.get_asset_dof_properties(self.hand_asset)
+-        dof_names = self.gym.get_asset_dof_names(self.hand_asset)
+-        # print("Allegro Hand DOF names:", dof_names)
+-        # Allegro Hand DOF names: ['joint_0.0', 'joint_1.0', 'joint_2.0', 'joint_3.0',
+-        # 'joint_12.0', 'joint_13.0', 'joint_14.0', 'joint_15.0',
+-        # 'joint_4.0', 'joint_5.0', 'joint_6.0', 'joint_7.0',
+-        # 'joint_8.0', 'joint_9.0', 'joint_10.0', 'joint_11.0']
+-        #
+-        # FINGER_ORDER = {
+-        #     "index": [0, 1, 2, 3],
+-        #     "thumb": [4, 5, 6, 7],
+-        #     "middle": [8, 9, 10, 11],
+-        #     "ring": [12, 13, 14, 15]
+-        # }
+-
+-        self.allegro_hand_dof_lower_limits = []
+-        self.allegro_hand_dof_upper_limits = []
+-
+-        for i in range(self.num_allegro_hand_dofs):
+-            self.allegro_hand_dof_lower_limits.append(allegro_hand_dof_props["lower"][i])
+-            self.allegro_hand_dof_upper_limits.append(allegro_hand_dof_props["upper"][i])
+-            allegro_hand_dof_props["effort"][i] = 0.5
+-            if self.torque_control:
+-                allegro_hand_dof_props["stiffness"][i] = 0.0
+-                allegro_hand_dof_props["damping"][i] = 0.0
+-                allegro_hand_dof_props["driveMode"][i] = gymapi.DOF_MODE_EFFORT
+-            else:
+-                allegro_hand_dof_props["stiffness"][i] = self.config["env"]["controller"]["pgain"]
+-                allegro_hand_dof_props["damping"][i] = self.config["env"]["controller"]["dgain"]
+-            allegro_hand_dof_props["friction"][i] = 0.01
+-            allegro_hand_dof_props["armature"][i] = 0.001
+-
+-        self.allegro_hand_dof_lower_limits = to_torch(self.allegro_hand_dof_lower_limits, device=self.device)
+-        self.allegro_hand_dof_upper_limits = to_torch(self.allegro_hand_dof_upper_limits, device=self.device)
+-
+-        hand_pose, obj_pose = self._init_object_pose()
+-
+-        # compute aggregate size
+-        self.num_allegro_hand_bodies = self.gym.get_asset_rigid_body_count(self.hand_asset)
+-        self.num_allegro_hand_shapes = self.gym.get_asset_rigid_shape_count(self.hand_asset)
+-        max_agg_bodies = self.num_allegro_hand_bodies + 2
+-        max_agg_shapes = self.num_allegro_hand_shapes + 2
+-
+-        self.envs = []
+-        self.object_init_state = []
+-        self.hand_indices = []
+-        self.object_indices = []
+-
+-        allegro_hand_rb_count = self.gym.get_asset_rigid_body_count(self.hand_asset)
+-        object_rb_count = 1
+-        self.object_rb_handles = list(range(allegro_hand_rb_count, allegro_hand_rb_count + object_rb_count))
+-
+-        for i in range(num_envs):
+-            # create env instance
+-            env_ptr = self.gym.create_env(self.sim, lower, upper, num_per_row)
+-            if self.aggregate_mode >= 1:
+-                self.gym.begin_aggregate(env_ptr, max_agg_bodies * 20, max_agg_shapes * 20, True)
+-
+-            # add hand - collision filter = -1 to use asset collision filters set in mjcf loader
+-            hand_actor = self.gym.create_actor(env_ptr, self.hand_asset, hand_pose, "hand", i, -1, 0)
+-            self.gym.set_actor_dof_properties(env_ptr, hand_actor, allegro_hand_dof_props)
+-            hand_idx = self.gym.get_actor_index(env_ptr, hand_actor, gymapi.DOMAIN_SIM)
+-            self.hand_indices.append(hand_idx)
+-
+-            # add object
+-            object_type_id = np.random.choice(len(self.object_type_list), p=self.object_type_prob)
+-            object_asset = self.object_asset_list[object_type_id]
+-
+-            object_handle = self.gym.create_actor(env_ptr, object_asset, obj_pose, "object", i, 0, 0)
+-
+-            # colorize by object type (cylinder=blue, cuboid=green) ===
+-            obj_name = self.object_type_list[object_type_id]
+-            if obj_name.startswith("cylinder"):
+-                self.gym.set_rigid_body_color(
+-                    env_ptr, object_handle, 0, gymapi.MESH_VISUAL, gymapi.Vec3(0.1, 0.1, 0.9)
+-                )
+-            elif obj_name.startswith("cuboid"):
+-                self.gym.set_rigid_body_color(
+-                    env_ptr, object_handle, 0, gymapi.MESH_VISUAL, gymapi.Vec3(0.1, 0.85, 0.1)
+-                )
+-
+-            self.object_init_state.append([obj_pose.p.x,obj_pose.p.y,obj_pose.p.z,
+-                                           obj_pose.r.x,obj_pose.r.y,obj_pose.r.z,obj_pose.r.w,
+-                                           0, 0, 0, 0, 0, 0,])
+-            object_idx = self.gym.get_actor_index(env_ptr, object_handle, gymapi.DOMAIN_SIM)
+-            self.object_indices.append(object_idx)
+-
+-            obj_scale = self.base_obj_scale
+-            if self.randomize_scale:
+-                num_scales = len(self.randomize_scale_list)
+-                obj_scale = np.random.uniform(
+-                    self.randomize_scale_list[i % num_scales] - 0.025,
+-                    self.randomize_scale_list[i % num_scales] + 0.025,
+-                )
+-            self.gym.set_actor_scale(env_ptr, object_handle, obj_scale)
+-            self._update_priv_buf(env_id=i, name="obj_scale", value=obj_scale)
+-
+-            obj_com = [0, 0, 0]
+-            if self.randomize_com:
+-                prop = self.gym.get_actor_rigid_body_properties(env_ptr, object_handle)
+-                assert len(prop) == 1
+-                obj_com = [
+-                    np.random.uniform(self.randomize_com_lower, self.randomize_com_upper),
+-                    np.random.uniform(self.randomize_com_lower, self.randomize_com_upper),
+-                    np.random.uniform(self.randomize_com_lower, self.randomize_com_upper),
+-                ]
+-                prop[0].com.x, prop[0].com.y, prop[0].com.z = obj_com
+-                self.gym.set_actor_rigid_body_properties(env_ptr, object_handle, prop)
+-            self._update_priv_buf(env_id=i, name="obj_com", value=obj_com)
+-
+-            obj_friction = 1.0
+-            if self.randomize_friction:
+-                rand_friction = np.random.uniform(self.randomize_friction_lower, self.randomize_friction_upper)
+-                hand_props = self.gym.get_actor_rigid_shape_properties(env_ptr, hand_actor)
+-                for p in hand_props:
+-                    p.friction = rand_friction
+-                self.gym.set_actor_rigid_shape_properties(env_ptr, hand_actor, hand_props)
+-                object_props = self.gym.get_actor_rigid_shape_properties(env_ptr, object_handle)
+-                for p in object_props:
+-                    p.friction = rand_friction
+-                self.gym.set_actor_rigid_shape_properties(env_ptr, object_handle, object_props)
+-                obj_friction = rand_friction
+-            self._update_priv_buf(env_id=i, name="obj_friction", value=obj_friction)
+-
+-            if self.randomize_mass:
+-                prop = self.gym.get_actor_rigid_body_properties(env_ptr, object_handle)
+-                for p in prop:
+-                    p.mass = np.random.uniform(self.randomize_mass_lower, self.randomize_mass_upper)
+-                self.gym.set_actor_rigid_body_properties(env_ptr, object_handle, prop)
+-                self._update_priv_buf(env_id=i, name="obj_mass", value=prop[0].mass)
+-            else:
+-                prop = self.gym.get_actor_rigid_body_properties(env_ptr, object_handle)
+-                self._update_priv_buf(env_id=i, name="obj_mass", value=prop[0].mass)
+-
+-            if self.aggregate_mode > 0:
+-                self.gym.end_aggregate(env_ptr)
+-
+-            self.envs.append(env_ptr)
+-
+-        self.object_init_state = to_torch(self.object_init_state, device=self.device, dtype=torch.float).view(self.num_envs, 13)
+-        self.object_rb_handles = to_torch(self.object_rb_handles, dtype=torch.long, device=self.device)
+-        self.hand_indices = to_torch(self.hand_indices, dtype=torch.long, device=self.device)
+-        self.object_indices = to_torch(self.object_indices, dtype=torch.long, device=self.device)
+-
+-    def reset_idx(self, env_ids):
+-        if self.randomize_pd_gains:
+-            self.p_gain[env_ids] = torch_rand_float(
+-                self.randomize_p_gain_lower,
+-                self.randomize_p_gain_upper,
+-                (len(env_ids), self.num_actions),
+-                device=self.device,
+-            ).squeeze(1)
+-
+-            self.d_gain[env_ids] = torch_rand_float(
+-                self.randomize_d_gain_lower,
+-                self.randomize_d_gain_upper,
+-                (len(env_ids), self.num_actions),
+-                device=self.device,
+-            ).squeeze(1)
+-
+-        # reset rigid body forces
+-        self.rb_forces[env_ids, :, :] = 0.0
+-
+-        num_scales = len(self.randomize_scale_list)
+-        for n_s in range(num_scales):
+-            s_ids = env_ids[(env_ids % num_scales == n_s).nonzero(as_tuple=False).squeeze(-1)]
+-            if len(s_ids) == 0:
+-                continue
+-            obj_scale = self.randomize_scale_list[n_s]
+-            scale_key = str(obj_scale)
+-            sampled_pose_idx = np.random.randint(self.saved_grasping_states[scale_key].shape[0], size=len(s_ids))
+-            sampled_pose = self.saved_grasping_states[scale_key][sampled_pose_idx].clone()
+-            self.root_state_tensor[self.object_indices[s_ids], :7] = sampled_pose[:, 16:]
+-            self.root_state_tensor[self.object_indices[s_ids], 7:13] = 0
+-            pos = sampled_pose[:, :16]
+-            self.allegro_hand_dof_pos[s_ids, :] = pos
+-            self.allegro_hand_dof_vel[s_ids, :] = 0
+-            self.prev_targets[s_ids, : self.num_allegro_hand_dofs] = pos
+-            self.cur_targets[s_ids, : self.num_allegro_hand_dofs] = pos
+-            self.init_pose_buf[s_ids, :] = pos.clone()
+-
+-        object_indices = torch.unique(self.object_indices[env_ids]).to(torch.int32)
+-        self.gym.set_actor_root_state_tensor_indexed(
+-            self.sim,
+-            gymtorch.unwrap_tensor(self.root_state_tensor),
+-            gymtorch.unwrap_tensor(object_indices),
+-            len(object_indices),
+-        )
+-        hand_indices = self.hand_indices[env_ids].to(torch.int32)
+-        if not self.torque_control:
+-            self.gym.set_dof_position_target_tensor_indexed(
+-                self.sim,
+-                gymtorch.unwrap_tensor(self.prev_targets),
+-                gymtorch.unwrap_tensor(hand_indices),
+-                len(env_ids),
+-            )
+-        self.gym.set_dof_state_tensor_indexed(
+-            self.sim,
+-            gymtorch.unwrap_tensor(self.dof_state),
+-            gymtorch.unwrap_tensor(hand_indices),
+-            len(env_ids),
+-        )
+-
+-        self.progress_buf[env_ids] = 0
+-        self.obs_buf[env_ids] = 0
+-        self.rb_forces[env_ids] = 0
+-        self.priv_info_buf[env_ids, 0:3] = 0
+-        self.proprio_hist_buf[env_ids] = 0
+-        self.at_reset_buf[env_ids] = 1
+-
+-    # ---- plotting helpers (put near other debug helpers) ----
+-    def _create_dof_plot_figure(self, fig_attr, axes_attr, lines_attr, hist_len, plot_dofs, line_specs, title_prefix, show_dof_limits=False, fixed_ylim=None):
+-        """Generic helper to create a 4x4 DOF plot figure."""
+-        import os, matplotlib
+-        if os.environ.get("DISPLAY", "") == "":
+-            matplotlib.use("Agg")
+-        import matplotlib.pyplot as plt
+-        import numpy as np
+-        plt.ion()
+-
+-        if getattr(self, fig_attr, None) is not None:
+-            return
+-
+-        fig = plt.figure(figsize=(16, 12))
+-        axes = []
+-        lines = {}
+-
+-        x = np.arange(hist_len)
+-
+-        lower_limits = self.allegro_hand_dof_lower_limits.detach().cpu().numpy()
+-        upper_limits = self.allegro_hand_dof_upper_limits.detach().cpu().numpy()
+-
+-        for idx, dof_i in enumerate(plot_dofs):
+-            ax = fig.add_subplot(4, 4, idx + 1)
+-            axes.append(ax)
+-
+-            ax.set_title(f"{title_prefix} - DOF {dof_i}", fontsize=9)
+-            ax.set_xlim(0, hist_len - 1)
+-            if idx >= 12:
+-                ax.set_xlabel("steps")
+-            ax.grid(True, alpha=0.3)
+-
+-            dof_lines = {}
+-            for line_key, spec in line_specs.items():
+-                (line,) = ax.plot(x, np.zeros_like(x), label=spec['label'], linewidth=1.0)
+-                if 'visible' in spec:
+-                    line.set_visible(spec['visible'])
+-                dof_lines[line_key] = line
+-
+-            if show_dof_limits:
+-                lim_low = float(lower_limits[dof_i])
+-                lim_high = float(upper_limits[dof_i])
+-                (hlow,) = ax.plot([0, hist_len - 1], [lim_low, lim_low], "k--", linewidth=1, alpha=0.5)
+-                (hhigh,) = ax.plot([0, hist_len - 1], [lim_high, lim_high], "k--", linewidth=1, alpha=0.5)
+-                dof_lines['lim_low'] = hlow
+-                dof_lines['lim_high'] = hhigh
+-
+-            if fixed_ylim:
+-                ax.set_ylim(fixed_ylim)
+-
+-            if idx == 0:
+-                ax.legend(loc="upper right", fontsize=8)
+-
+-            lines[dof_i] = dof_lines
+-
+-        fig.tight_layout()
+-
+-        setattr(self, fig_attr, fig)
+-        setattr(self, axes_attr, axes)
+-        setattr(self, lines_attr, lines)
+-
+-    def _ensure_plots(self):
+-        """Create all debug plots."""
+-        if not self.debug_plots:
+-            return
+-
+-        # --- Obs Plot ---
+-        if not getattr(self, "_obs_fig", None):
+-            # Initialize buffers specific to obs plot
+-            import numpy as np
+-            self._obs_hist_len = 500
+-            self._obs_x = np.arange(self._obs_hist_len)
+-            self._obs_hist = np.zeros((self._obs_hist_len, 16), dtype=np.float32)
+-
+-            line_specs_obs = {
+-                'pos': {'label': 'pos(norm)'}
+-            }
+-            self._create_dof_plot_figure(
+-                fig_attr='_obs_fig',
+-                axes_attr='_obs_axes',
+-                lines_attr='_obs_lines',
+-                hist_len=self._obs_hist_len,
+-                plot_dofs=list(range(16)),
+-                line_specs=line_specs_obs,
+-                title_prefix='env0 obs',
+-                show_dof_limits=False,
+-                fixed_ylim=(-1.1, 1.1)
+-            )
+-
+-        # --- Action Plot ---
+-        if not getattr(self, '_dbg_fig', None):
+-            line_specs_act = {
+-                'act': {'label': 'actions'},
+-                'prev': {'label': 'prev_target'},
+-                'tgt': {'label': 'target(before clamp)'},
+-                'cur': {'label': 'cur_target(after clamp)', 'visible': True},
+-            }
+-
+-            self._create_dof_plot_figure(
+-                fig_attr='_dbg_fig',
+-                axes_attr='_dbg_axes',
+-                lines_attr='_dbg_lines',
+-                hist_len=self.debug_hist_len,
+-                plot_dofs=self._plot_dofs,
+-                line_specs=line_specs_act,
+-                title_prefix='env0 action',
+-                show_dof_limits=True,
+-                fixed_ylim=None
+-            )
+-
+-
+-    def _update_plots(self):
+-        """Update all debug plots with the latest history data."""
+-        if not self.debug_plots:
+-            return
+-        import numpy as np
+-        import matplotlib.pyplot as plt
+-
+-        self._ensure_plots()
+-
+-        # --- Update Obs Plot ---
+-        if getattr(self, "_obs_fig", None):
+-            latest_obs = self.obs_buf_lag_history[0, -1, 0:16].detach().cpu().numpy().astype(np.float32)
+-            self._obs_hist[:-1] = self._obs_hist[1:]
+-            self._obs_hist[-1] = latest_obs
+-            for i, ax in enumerate(self._obs_axes):
+-                self._obs_lines[i]["pos"].set_ydata(self._obs_hist[:, i])
+-
+-        # --- Update Action Plot ---
+-        if getattr(self, '_dbg_fig', None):
+-            for ax, dof_i in zip(self._dbg_axes, self._plot_dofs):
+-                h = self._dbg_lines[dof_i]
+-                y_act  = self._hist_actions[:, dof_i]
+-                y_prev = self._hist_prev_target[:, dof_i]
+-                y_tgt  = self._hist_target_raw[:, dof_i]
+-                y_cur  = self._hist_cur_target[:, dof_i]
+-
+-                h["act"].set_ydata(y_act)
+-                h["prev"].set_ydata(y_prev)
+-                h["tgt"].set_ydata(y_tgt)
+-                h["cur"].set_ydata(y_cur)
+-
+-                if self.debug_compare_latest:
+-                    diff_ok = not np.isclose(y_cur[-1], y_tgt[-1], rtol=0.0, atol=self.debug_atol)
+-                else:
+-                    diff_ok = not np.allclose(y_cur, y_tgt, rtol=0.0, atol=self.debug_atol)
+-                h["cur"].set_visible(diff_ok)
+-
+-                visible_series = []
+-                for key in ("act", "prev", "tgt", "cur"):
+-                    line = h[key]
+-                    if line.get_visible():
+-                        y = line.get_ydata()
+-                        if y is not None and len(y) > 0 and np.isfinite(y).any():
+-                            visible_series.append(y)
+-                if len(visible_series) == 0:
+-                    y_min, y_max = -1.0, 1.0
+-                else:
+-                    y_cat = np.concatenate(visible_series)
+-                    y_min, y_max = float(np.nanmin(y_cat)), float(np.nanmax(y_cat))
+-                    if not np.isfinite(y_min) or not np.isfinite(y_max):
+-                        y_min, y_max = -1.0, 1.0
+-                    if y_min == y_max:
+-                        y_min -= 0.1
+-                        y_max += 0.1
+-                ax.set_ylim(y_min, y_max)
+-
+-        # --- Common pause and save ---
+-        try:
+-            plt.pause(0.001)
+-        except Exception:
+-            if (self._dbg_step % 50) == 0:
+-                if getattr(self, "_obs_fig", None):
+-                    self._obs_fig.savefig(os.path.join(self.debug_dir, f"obs_debug_{self._dbg_step:06d}.png"))
+-                if getattr(self, "_dbg_fig", None):
+-                    self._dbg_fig.savefig(os.path.join(self.debug_dir, f"allegro_debug_{self._dbg_step:06d}.png"))
+-
+-
+-    def compute_observations(self):
+-        self._refresh_gym()
+-
+-        # deal with normal observation, do sliding window
+-        # obs_buf_lag_history: VecTask (self.num_envs, 80, self.num_obs // 3)
+-        # prev_obs_buf: (self.num_envs, 79, self.num_obs // 3)
+-
+-        prev_obs_buf = self.obs_buf_lag_history[:, 1:].clone() # 1, 79, 32
+-        # self.allegro_hand_dof_pos: real value
+-        joint_noise_matrix = (torch.rand(self.allegro_hand_dof_pos.shape) * 2.0 - 1.0) * self.joint_noise_scale
+-        # normalized (pos + noise) // "q"
+-        cur_dof_normalized = (
+-            unscale( 
+-                joint_noise_matrix.to(self.device) + self.allegro_hand_dof_pos, # add noise
+-                self.allegro_hand_dof_lower_limits,
+-                self.allegro_hand_dof_upper_limits,
+-            )
+-            .clone()
+-            .unsqueeze(1)
+-        )
+-        cur_tar_buf = self.cur_targets[:, None] # 1, 1, 16 // "a"
+-        # cur_tar_buf: NOT normalized target
+-        cur_obs_buf = torch.cat([cur_dof_normalized, cur_tar_buf], dim=-1) 
+-
+-        # length 80
+-        self.obs_buf_lag_history[:] = torch.cat([prev_obs_buf, cur_obs_buf], dim=1)
+-
+-        # refill the initialized buffers
+-        at_reset_env_ids = self.at_reset_buf.nonzero(as_tuple=False).squeeze(-1)
+-        self.at_reset_buf[at_reset_env_ids] = 0
+-
+-        # ============== RESETTING THE BUFFERS FOR RESET ENVS ==============
+-        # 0:16: normalized pos
+-        self.obs_buf_lag_history[at_reset_env_ids, :, 0:16] = (
+-            unscale(
+-                self.allegro_hand_dof_pos[at_reset_env_ids],
+-                self.allegro_hand_dof_lower_limits,
+-                self.allegro_hand_dof_upper_limits,
+-            )
+-            .clone()
+-            .unsqueeze(1)
+-        )
+-
+-        # 16:32: real target // set cur_target with current pos
+-        self.obs_buf_lag_history[at_reset_env_ids, :, 16:32] = (
+-            self.allegro_hand_dof_pos[at_reset_env_ids].unsqueeze(1)
+-            )
+-
+-        # ============== UPDATE OBS_BUF / PRORIO_HIST_BUF ==============
+-        # 3 steps history
+-        t_buf = (self.obs_buf_lag_history[:, -3:].reshape(self.num_envs, -1)).clone()
+-        # Fill self.obs_buf with the last 3 steps of self.obs_buf_lag_history // obs_buf is 96-dimensional (32 x 3)
+-        self.obs_buf[:, : t_buf.shape[1]] = t_buf
+-        # Fill self.proprio_hist_buf with the last 30 steps of self.obs_buf_lag_history // proprio_hist_buf torch.Size([1, 30, 32])
+-        self.proprio_hist_buf[:] = self.obs_buf_lag_history[:, -self.prop_hist_len :].clone() 
+-
+-
+-        if self.debug_plots:
+-            self._ensure_plots()
+-
+-        self._update_priv_buf(
+-            env_id=range(self.num_envs),
+-            name="obj_position",
+-            value=self.object_pos.clone(),
+-        )
+-
+-    def compute_reward(self, actions):
+-        self.rot_axis_buf[:, -1] = -1
+-        # pose diff penalty
+-        pose_diff_penalty = ((self.allegro_hand_dof_pos - self.init_pose_buf) ** 2).sum(-1)
+-        # work and torque penalty
+-        torque_penalty = (self.torques**2).sum(-1)
+-        work_penalty = ((self.torques * self.dof_vel_finite_diff).sum(-1)) ** 2
+-        # Compute offset in radians. Radians -> radians / sec
+-        angdiff = quat_to_axis_angle(quat_mul(self.object_rot, quat_conjugate(self.object_rot_prev)))
+-        object_angvel = angdiff / (self.control_freq_inv * self.dt)
+-        vec_dot = (object_angvel * self.rot_axis_buf).sum(-1)
+-        rotate_reward = torch.clip(vec_dot, max=self.angvel_clip_max, min=self.angvel_clip_min)
+-        # linear velocity: use position difference instead of self.object_linvel
+-        object_linvel = ((self.object_pos - self.object_pos_prev) / (self.control_freq_inv * self.dt)).clone()
+-        object_linvel_penalty = torch.norm(object_linvel, p=1, dim=-1)
+-
+-        self.rew_buf[:] = compute_hand_reward(
+-            object_linvel_penalty,
+-            self.object_linvel_penalty_scale,
+-            rotate_reward,
+-            self.rotate_reward_scale,
+-            pose_diff_penalty,
+-            self.pose_diff_penalty_scale,
+-            torque_penalty,
+-            self.torque_penalty_scale,
+-            work_penalty,
+-            self.work_penalty_scale,
+-        )
+-        self.reset_buf[:] = self.check_termination(self.object_pos)
+-        self.extras["rotation_reward"] = rotate_reward.mean()
+-        self.extras["object_linvel_penalty"] = object_linvel_penalty.mean()
+-        self.extras["pose_diff_penalty"] = pose_diff_penalty.mean()
+-        self.extras["work_done"] = work_penalty.mean()
+-        self.extras["torques"] = torque_penalty.mean()
+-        self.extras["roll"] = object_angvel[:, 0].mean()
+-        self.extras["pitch"] = object_angvel[:, 1].mean()
+-        self.extras["yaw"] = object_angvel[:, 2].mean()
+-
+-        if self.evaluate:
+-            finished_episode_mask = self.reset_buf == 1
+-            self.stat_sum_rewards += self.rew_buf.sum()
+-            self.stat_sum_rotate_rewards += rotate_reward.sum()
+-            self.stat_sum_torques += self.torques.abs().sum()
+-            self.stat_sum_obj_linvel += (self.object_linvel**2).sum(-1).sum()
+-            self.stat_sum_episode_length += (self.reset_buf == 0).sum()
+-            self.env_evaluated += (self.reset_buf == 1).sum()
+-            self.env_timeout_counter[finished_episode_mask] += 1
+-            info = (
+-                f"progress {self.env_evaluated} / {self.max_evaluate_envs} | "
+-                f"reward: {self.stat_sum_rewards / self.env_evaluated:.2f} | "
+-                f"eps length: {self.stat_sum_episode_length / self.env_evaluated:.2f} | "
+-                f"rotate reward: {self.stat_sum_rotate_rewards / self.env_evaluated:.2f} | "
+-                f"lin vel (x100): {self.stat_sum_obj_linvel * 100 / self.stat_sum_episode_length:.4f} | "
+-                f"command torque: {self.stat_sum_torques / self.stat_sum_episode_length:.2f}"
+-            )
+-            tprint(info)
+-            if self.env_evaluated >= self.max_evaluate_envs:
+-                exit()
+-
+-    def post_physics_step(self):
+-        self.progress_buf += 1
+-        self.reset_buf[:] = 0
+-        self._refresh_gym()
+-        self.compute_reward(self.actions)
+-        env_ids = self.reset_buf.nonzero(as_tuple=False).squeeze(-1)
+-        if len(env_ids) > 0:
+-            self.reset_idx(env_ids)
+-        self.compute_observations()
+-
+-        if self.viewer and self.debug_viz:
+-            # draw axes on target object
+-            self.gym.clear_lines(self.viewer)
+-            self.gym.refresh_rigid_body_state_tensor(self.sim)
+-
+-            for i in range(self.num_envs):
+-                objectx = ((self.object_pos[i]+ quat_apply(self.object_rot[i],to_torch([1, 0, 0], device=self.device) * 0.2,)).cpu().numpy())
+-                objecty = ((self.object_pos[i]+ quat_apply(self.object_rot[i],to_torch([0, 1, 0], device=self.device) * 0.2,)).cpu().numpy())
+-                objectz = ((self.object_pos[i]+ quat_apply(self.object_rot[i],to_torch([0, 0, 1], device=self.device) * 0.2,)).cpu().numpy())
+-                # Calculate the position of the object's principal axis direction using current_main_vector ??
+-                objectm = (self.object_pos[i] + self.rot_axis_buf[i]).cpu().numpy()
+-
+-                p0 = self.object_pos[i].cpu().numpy()
+-                self.gym.add_lines(
+-                    self.viewer,
+-                    self.envs[i],
+-                    1,
+-                    [p0[0], p0[1], p0[2], objectx[0], objectx[1], objectx[2]],
+-                    [0.85, 0.1, 0.1],
+-                )
+-                self.gym.add_lines(
+-                    self.viewer,
+-                    self.envs[i],
+-                    1,
+-                    [p0[0], p0[1], p0[2], objecty[0], objecty[1], objecty[2]],
+-                    [0.1, 0.85, 0.1],
+-                )
+-                self.gym.add_lines(
+-                    self.viewer,
+-                    self.envs[i],
+-                    1,
+-                    [p0[0], p0[1], p0[2], objectz[0], objectz[1], objectz[2]],
+-                    [0.1, 0.1, 0.85],
+-                )
+-
+-                # Draw the main rotation direction line of the object (purple series)
+-                self.gym.add_lines(
+-                    self.viewer,
+-                    self.envs[i],
+-                    1,
+-                    [p0[0], p0[1], p0[2], objectm[0], objectm[1], objectm[2]],
+-                    [0.85, 0.1, 0.85],
+-                )
+-
+-    def _create_ground_plane(self):
+-        plane_params = gymapi.PlaneParams()
+-        plane_params.normal = gymapi.Vec3(0.0, 0.0, 1.0)
+-        self.gym.add_ground(self.sim, plane_params)
+-
+-
+-    # ===== (2) Common helpers =====
+-    def _to_np(self, x):
+-        return x.detach().to("cpu").float().numpy()
+-
+-    def _pick_env0_1d(self, arr_np):
+-        """arr_np: (num_envs, dof) or (dof,) -> always returns (dof,) (selects env0)"""
+-        if arr_np.ndim == 1:
+-            return arr_np
+-        return arr_np[0]
+-
+-    def _push_row(self, hist: np.ndarray, row: np.ndarray):
+-        """Sliding window push: hist:(T,D), row:(D,)"""
+-        if row.ndim > 1:
+-            row = row.reshape(-1)
+-        D = hist.shape[1]
+-        if row.shape[0] != D:
+-            n = min(D, row.shape[0])
+-            buf = np.zeros((D,), dtype=np.float32)
+-            buf[:n] = row[:n]
+-            row = buf
+-        hist[:-1] = hist[1:]
+-        hist[-1] = row
+-
+-
+-
+-
+-
+-
+-
+-    def pre_physics_step(self, actions):
+-
+-        # 1. actions
+-        # 2. prev_target
+-        # 3. target(before clamp)
+-        # 4. cur_target(after clamp)
+-        self.actions = actions.clone().to(self.device)
+-        targets = self.prev_targets + 1 / 24 * self.actions
+-
+-        if self.debug_plots or self.action_recording:
+-            debug_prev_targets = self.prev_targets.clone()
+-
+-        self.cur_targets[:] = tensor_clamp(
+-            targets,
+-            self.allegro_hand_dof_lower_limits,
+-            self.allegro_hand_dof_upper_limits,
+-        )
+-
+-        self.prev_targets[:] = self.cur_targets.clone()
+-
+-        # 4) Push debugging history + plotting
+-        if (self.debug_plots or self.action_recording) and debug_prev_targets is not None:
+-            # Set up once for the first time
+-            self._ensure_plots()
+-
+-            act_np = self._to_np(self.actions)
+-            prv_np = self._to_np(debug_prev_targets)    # NOTE: copy before being updated by cur
+-            tgt_np = self._to_np(targets)
+-            cur_np = self._to_np(self.cur_targets)
+-
+-            # Always use env0
+-            act_row = self._pick_env0_1d(act_np)
+-            prv_row = self._pick_env0_1d(prv_np)
+-            tgt_row = self._pick_env0_1d(tgt_np)
+-            cur_row = self._pick_env0_1d(cur_np)
+-
+-            self._push_row(self._hist_actions,     act_row)
+-            self._push_row(self._hist_prev_target, prv_row)
+-            self._push_row(self._hist_target_raw,  tgt_row)
+-            self._push_row(self._hist_cur_target,  cur_row)
+-
+-            if self.debug_plots:
+-                self._update_plots()
+-
+-        self._dbg_step += 1
+-
+-        if self.action_recording and not self._action_saved and self._dbg_step == 500:
+-            npz_path = os.path.join(self.debug_dir, "actions_500.npz")
+-            np.savez(npz_path, actions=self._hist_actions)
+-            self._action_saved = True
+-            print(f"Saved first 500 actions of env0 to {npz_path}")
+-
+-        self.object_rot_prev[:] = self.object_rot
+-        self.object_pos_prev[:] = self.object_pos
+-
+-        if self.force_scale > 0.0:
+-            self.rb_forces *= torch.pow(
+-                self.force_decay, self.dt / self.force_decay_interval
+-            )
+-            # apply new forces
+-            obj_mass = to_torch(
+-                [
+-                    self.gym.get_actor_rigid_body_properties(
+-                        env, self.gym.find_actor_handle(env, "object")
+-                    )[0].mass
+-                    for env in self.envs
+-                ],
+-                device=self.device,
+-            )
+-            prob = self.random_force_prob_scalar
+-            force_indices = (torch.less(torch.rand(self.num_envs, device=self.device), prob)).nonzero()
+-            self.rb_forces[force_indices, self.object_rb_handles, :] = (torch.randn(
+-                    self.rb_forces[force_indices, self.object_rb_handles, :].shape,
+-                    device=self.device,)
+-                * obj_mass[force_indices, None]
+-                * self.force_scale
+-            )
+-            self.gym.apply_rigid_body_force_tensors(self.sim, gymtorch.unwrap_tensor(self.rb_forces), None, gymapi.ENV_SPACE)
+-
+-    def reset(self):
+-        super().reset()
+-        self.obs_dict["priv_info"] = self.priv_info_buf.to(self.rl_device)
+-        self.obs_dict["proprio_hist"] = self.proprio_hist_buf.to(self.rl_device)
+-        return self.obs_dict
+-
+-    def step(self, actions):
+-        super().step(actions)
+-        self.obs_dict["priv_info"] = self.priv_info_buf.to(self.rl_device)
+-        self.obs_dict["proprio_hist"] = self.proprio_hist_buf.to(self.rl_device)
+-        return self.obs_dict, self.rew_buf, self.reset_buf, self.extras
+-
+-
+-    def _ensure_err_plot(self):
+-        """Dedicated plot to draw pos_error(rad) of env0 in 4x4."""
+-        if not self.debug_plots:
+-            return
+-        if self._err_fig is not None and self._err_axes is not None and self._err_lines is not None:
+-            return
+-
+-        import os, matplotlib
+-        if os.environ.get("DISPLAY", "") == "":
+-            matplotlib.use("Agg")
+-        import matplotlib.pyplot as plt
+-        import numpy as np
+-
+-        plt.ion()
+-        # (Change) Error plot is 6 times longer
+-        x = np.arange(self._err_hist_len)
+-
+-        self._err_fig = plt.figure(figsize=(16, 12))
+-        self._err_axes = []
+-        self._err_lines = {}
+-
+-        for idx, dof_i in enumerate(self._plot_dofs):
+-            ax = self._err_fig.add_subplot(4, 4, idx + 1)
+-            self._err_axes.append(ax)
+-            ax.set_title(f"pos_error (rad) - DOF {dof_i}", fontsize=9)
+-            if idx >= 12:
+-                ax.set_xlabel(f"steps (×{self.err_hist_len_mult})")  # Notation only
+-            # (Original) ax.set_xlim(0, self.debug_hist_len - 1)
+-            ax.set_xlim(0, self._err_hist_len - 1)
+-            ax.grid(True, alpha=0.3)
+-
+-            ax.axhline(0.0, linestyle="--", linewidth=1.0, alpha=0.5)
+-
+-            (l_err,) = ax.plot(x, np.zeros_like(x), linewidth=1.0)
+-            self._err_lines[dof_i] = l_err
+-
+-        self._err_fig.tight_layout()
+-
+-
+-    def _update_err_plot(self):
+-        if not self.debug_plots or self._err_fig is None:
+-            return
+-        import numpy as np
+-        import matplotlib.pyplot as plt
+-
+-        for ax, dof_i in zip(self._err_axes, self._plot_dofs):
+-            y = self._hist_pos_error[:, dof_i]   # Already 6x length buffer
+-            self._err_lines[dof_i].set_ydata(y)
+-
+-            if np.isfinite(y).any():
+-                ymin = float(np.nanmin(y))
+-                ymax = float(np.nanmax(y))
+-                if ymin == ymax:
+-                    ymin -= 1e-3
+-                    ymax += 1e-3
+-                pad = 0.05 * max(1e-6, (ymax - ymin))
+-                ax.set_ylim(ymin - pad, ymax + pad)
+-            else:
+-                ax.set_ylim(-1.0, 1.0)
+-
+-        try:
+-            plt.pause(0.001)
+-        except Exception:
+-            if (self._dbg_step % 50) == 0:
+-                self._err_fig.savefig(os.path.join(self.debug_dir, f"pos_error_only_{self._dbg_step:06d}.png"))
+-
+-
+-    def update_low_level_control(self):
+-        previous_dof_pos = self.allegro_hand_dof_pos.clone()
+-        self._refresh_gym()
+-        if self.torque_control: # True
+-            dof_pos = self.allegro_hand_dof_pos
+-            dof_vel = (dof_pos - previous_dof_pos) / self.dt
+-            self.dof_vel_finite_diff = dof_vel.clone()
+-
+-            pos_error = self.cur_targets - dof_pos
+-            if self.debug_plots:
+-                self._ensure_err_plot()
+-                perr_np  = self._to_np(pos_error)           # (num_envs, dof)
+-                perr_row = self._pick_env0_1d(perr_np)      # (dof,)
+-                self._push_row(self._hist_pos_error, perr_row)
+-                self._update_err_plot()
+-
+-            torques = self.p_gain * pos_error - self.d_gain * dof_vel
+-            self.torques = torch.clip(torques, -0.5, 0.5).clone()
+-            self.gym.set_dof_actuation_force_tensor(self.sim, gymtorch.unwrap_tensor(self.torques))
+-        else:
+-            self.gym.set_dof_position_target_tensor(self.sim, gymtorch.unwrap_tensor(self.cur_targets))
+-
+-    def check_termination(self, object_pos):
+-        resets = torch.logical_or(
+-            torch.less(object_pos[:, -1], self.reset_z_threshold),
+-            torch.greater_equal(self.progress_buf, self.max_episode_length),
+-        )
+-        return resets
+-
+-    def _refresh_gym(self):
+-        self.gym.refresh_dof_state_tensor(self.sim)
+-        self.gym.refresh_actor_root_state_tensor(self.sim)
+-        self.gym.refresh_rigid_body_state_tensor(self.sim)
+-        self.gym.refresh_net_contact_force_tensor(self.sim)
+-        self.object_pose = self.root_state_tensor[self.object_indices, 0:7]
+-        self.object_pos = self.root_state_tensor[self.object_indices, 0:3]
+-        self.object_rot = self.root_state_tensor[self.object_indices, 3:7]
+-        self.object_linvel = self.root_state_tensor[self.object_indices, 7:10]
+-        self.object_angvel = self.root_state_tensor[self.object_indices, 10:13]
+-
+-    def _setup_domain_rand_config(self, rand_config):
+-        self.randomize_mass = rand_config["randomizeMass"]
+-        self.randomize_mass_lower = rand_config["randomizeMassLower"]
+-        self.randomize_mass_upper = rand_config["randomizeMassUpper"]
+-        self.randomize_com = rand_config["randomizeCOM"]
+-        self.randomize_com_lower = rand_config["randomizeCOMLower"]
+-        self.randomize_com_upper = rand_config["randomizeCOMUpper"]
+-        self.randomize_friction = rand_config["randomizeFriction"]
+-        self.randomize_friction_lower = rand_config["randomizeFrictionLower"]
+-        self.randomize_friction_upper = rand_config["randomizeFrictionUpper"]
+-        self.randomize_scale = rand_config["randomizeScale"]
+-        self.scale_list_init = rand_config["scaleListInit"]
+-        self.randomize_scale_list = rand_config["randomizeScaleList"]
+-        self.randomize_scale_lower = rand_config["randomizeScaleLower"]
+-        self.randomize_scale_upper = rand_config["randomizeScaleUpper"]
+-        self.randomize_pd_gains = rand_config["randomizePDGains"]
+-        self.randomize_p_gain_lower = rand_config["randomizePGainLower"]
+-        self.randomize_p_gain_upper = rand_config["randomizePGainUpper"]
+-        self.randomize_d_gain_lower = rand_config["randomizeDGainLower"]
+-        self.randomize_d_gain_upper = rand_config["randomizeDGainUpper"]
+-        self.joint_noise_scale = rand_config["jointNoiseScale"]
+-
+-    def _setup_priv_option_config(self, p_config):
+-        self.enable_priv_obj_position = p_config["enableObjPos"]
+-        self.enable_priv_obj_mass = p_config["enableObjMass"]
+-        self.enable_priv_obj_scale = p_config["enableObjScale"]
+-        self.enable_priv_obj_com = p_config["enableObjCOM"]
+-        self.enable_priv_obj_friction = p_config["enableObjFriction"]
+-
+-    def _update_priv_buf(self, env_id, name, value, lower=None, upper=None):
+-        # normalize to -1, 1
+-        s, e = self.priv_info_dict[name]
+-        if eval(f"self.enable_priv_{name}"):
+-            if type(value) is list:
+-                value = to_torch(value, dtype=torch.float, device=self.device)
+-            if type(lower) is list or upper is list:
+-                lower = to_torch(lower, dtype=torch.float, device=self.device)
+-                upper = to_torch(upper, dtype=torch.float, device=self.device)
+-            if lower is not None and upper is not None:
+-                value = (2.0 * value - upper - lower) / (upper - lower)
+-            self.priv_info_buf[env_id, s:e] = value
+-        else:
+-            self.priv_info_buf[env_id, s:e] = 0
+-
+-    def _setup_object_info(self, o_config):
+-        self.object_type = o_config["type"]
+-        raw_prob = o_config["sampleProb"]
+-        assert sum(raw_prob) == 1
+-
+-        primitive_list = self.object_type.split("+")
+-        print("---- Primitive List ----")
+-        print(primitive_list)
+-        self.object_type_prob = []
+-        self.object_type_list = []
+-        self.asset_files_dict = {
+-            "simple_tennis_ball": "assets/ball.urdf",
+-        }
+-
+-        for p_id, prim in enumerate(primitive_list):
+-            print(p_id, prim)
+-            if "cuboid" in prim:
+-                subset_name = self.object_type.split("_")[-1]
+-                cuboids = sorted(glob(f"assets/cuboid/{subset_name}/*.urdf"))
+-                cuboid_list = [f"cuboid_{i}" for i in range(len(cuboids))]
+-                self.object_type_list += cuboid_list
+-                for i, name in enumerate(cuboids):
+-                    self.asset_files_dict[f"cuboid_{i}"] = name.replace(
+-                        "../assets/", ""
+-                    )
+-                self.object_type_prob += [
+-                    raw_prob[p_id] / len(cuboid_list) for _ in cuboid_list
+-                ]
+-
+-            elif "cylinder" in prim:
+-                subset_name = self.object_type.split("_")[-1]
+-                cylinders = sorted(glob(f"assets/cylinder/{subset_name}/*.urdf"))
+-                cylinder_list = [f"cylinder_{i}" for i in range(len(cylinders))]
+-                self.object_type_list += cylinder_list
+-                for i, name in enumerate(cylinders):
+-                    self.asset_files_dict[f"cylinder_{i}"] = name.replace(
+-                        "../assets/", ""
+-                    )
+-                self.object_type_prob += [
+-                    raw_prob[p_id] / len(cylinder_list) for _ in cylinder_list
+-                ]
+-            elif "sphere" in prim:
+-                subset_name = self.object_type.split("_")[-1]
+-                cylinders = sorted(glob(f"assets/sphere/{subset_name}/*.urdf"))
+-                cylinder_list = [f"sphere_{i}" for i in range(len(cylinders))]
+-                self.object_type_list += cylinder_list
+-                for i, name in enumerate(cylinders):
+-                    self.asset_files_dict[f"sphere_{i}"] = name.replace(
+-                        "../assets/", ""
+-                    )
+-                self.object_type_prob += [
+-                    raw_prob[p_id] / len(cylinder_list) for _ in cylinder_list
+-                ]
+-            else:
+-                self.object_type_list += [prim]
+-                self.object_type_prob += [raw_prob[p_id]]
+-        print("---- Object List ----")
+-        print(self.object_type_list)
+-
+-        assert len(self.object_type_list) == len(self.object_type_prob)
+-
+-    def _allocate_task_buffer(self, num_envs):
+-        # extra buffers for observe randomized params
+-        self.prop_hist_len = self.config["env"]["hora"]["propHistoryLen"]
+-        self.num_env_factors = self.config["env"]["hora"]["privInfoDim"]
+-        self.priv_info_buf = torch.zeros((num_envs, self.num_env_factors), device=self.device, dtype=torch.float)
+-        self.proprio_hist_buf = torch.zeros((num_envs, self.prop_hist_len, 32), device=self.device, dtype=torch.float)
+-
+-    def _setup_reward_config(self, r_config):
+-        self.angvel_clip_min = r_config["angvelClipMin"]
+-        self.angvel_clip_max = r_config["angvelClipMax"]
+-        self.rotate_reward_scale = r_config["rotateRewardScale"]
+-        self.object_linvel_penalty_scale = r_config["objLinvelPenaltyScale"]
+-        self.pose_diff_penalty_scale = r_config["poseDiffPenaltyScale"]
+-        self.torque_penalty_scale = r_config["torquePenaltyScale"]
+-        self.work_penalty_scale = r_config["workPenaltyScale"]
+-
+-    def _create_object_asset(self):
+-        # object file to asset
+-        asset_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../")
+-        hand_asset_file = self.config["env"]["asset"]["handAsset"]
+-        # load hand asset
+-        hand_asset_options = gymapi.AssetOptions()
+-        hand_asset_options.flip_visual_attachments = False
+-        hand_asset_options.fix_base_link = True
+-        hand_asset_options.collapse_fixed_joints = True
+-        hand_asset_options.disable_gravity = True
+-        hand_asset_options.thickness = 0.001
+-        hand_asset_options.angular_damping = 0.01
+-
+-        if self.torque_control:
+-            hand_asset_options.default_dof_drive_mode = gymapi.DOF_MODE_EFFORT
+-        else:
+-            hand_asset_options.default_dof_drive_mode = gymapi.DOF_MODE_POS
+-        self.hand_asset = self.gym.load_asset(self.sim, asset_root, hand_asset_file, hand_asset_options)
+-
+-        # load object asset
+-        self.object_asset_list = []
+-        for object_type in self.object_type_list:
+-            object_asset_file = self.asset_files_dict[object_type]
+-            object_asset_options = gymapi.AssetOptions()
+-            object_asset = self.gym.load_asset(self.sim, asset_root, object_asset_file, object_asset_options)
+-            self.object_asset_list.append(object_asset)
+-
+-    def _init_object_pose(self):
+-        allegro_hand_start_pose = gymapi.Transform()
+-        allegro_hand_start_pose.p = gymapi.Vec3(0, 0, 0.5)
+-        allegro_hand_start_pose.r = gymapi.Quat.from_axis_angle(
+-            gymapi.Vec3(0, 1, 0), -np.pi / 2
+-        ) * gymapi.Quat.from_axis_angle(gymapi.Vec3(1, 0, 0), np.pi / 2)
+-        object_start_pose = gymapi.Transform()
+-        object_start_pose.p = gymapi.Vec3()
+-        object_start_pose.p.x = allegro_hand_start_pose.p.x
+-        pose_dx, pose_dy, pose_dz = -0.01, -0.04, 0.15
+-
+-        object_start_pose.p.x = allegro_hand_start_pose.p.x + pose_dx
+-        object_start_pose.p.y = allegro_hand_start_pose.p.y + pose_dy
+-        object_start_pose.p.z = allegro_hand_start_pose.p.z + pose_dz
+-
+-        object_start_pose.p.y = allegro_hand_start_pose.p.y - 0.01
+-        # for grasp pose generation, it is used to initialize the object
+-        # it should be slightly higher than the fingertip
+-        # so it is set to be 0.66 for internal allegro and 0.64 for the public allegro
+-        # ----
+-        # for in-hand object rotation, the initialization of z is only used in the first step
+-        # it is set to be 0.65 for backward compatibility
+-        object_z = 0.66 if self.save_init_pose else 0.65
+-        if "internal" not in self.grasp_cache_name:
+-            object_z -= 0.02
+-        object_start_pose.p.z = object_z
+-        return allegro_hand_start_pose, object_start_pose
+-
+-
+-def compute_hand_reward(
+-    object_linvel_penalty,
+-    object_linvel_penalty_scale: float,
+-    rotate_reward,
+-    rotate_reward_scale: float,
+-    pose_diff_penalty,
+-    pose_diff_penalty_scale: float,
+-    torque_penalty,
+-    torque_pscale: float,
+-    work_penalty,
+-    work_pscale: float,
+-):
+-    reward = rotate_reward_scale * rotate_reward
+-    # Distance from the hand to the object
+-    reward = reward + object_linvel_penalty * object_linvel_penalty_scale
+-    reward = reward + pose_diff_penalty * pose_diff_penalty_scale
+-    reward = reward + torque_penalty * torque_pscale
+-    reward = reward + work_penalty * work_pscale
+-    return reward
+-
+-
+-def quat_to_axis_angle(quaternions: torch.Tensor) -> torch.Tensor:
+-    """
+-    Convert rotations given as quaternions to axis/angle.
+-    Adapted from PyTorch3D:
+-    https://pytorch3d.readthedocs.io/en/latest/_modules/pytorch3d/transforms/rotation_conversions.html#quaternion_to_axis_angle
+-    Args:
+-        quaternions: quaternions with real part last,
+-            as tensor of shape (..., 4).
+-    Returns:
+-        Rotations given as a vector in axis angle form, as a tensor
+-            of shape (..., 3), where the magnitude is the angle
+-            turned anticlockwise in radians around the vector's
+-            direction.
+-    """
+-    norms = torch.norm(quaternions[..., :3], p=2, dim=-1, keepdim=True)
+-    half_angles = torch.atan2(norms, quaternions[..., 3:])
+-    angles = 2 * half_angles
+-    eps = 1e-6
+-    small_angles = angles.abs() < eps
+-    sin_half_angles_over_angles = torch.empty_like(angles)
+-    sin_half_angles_over_angles[~small_angles] = (
+-        torch.sin(half_angles[~small_angles]) / angles[~small_angles]
+-    )
+-    # for x small, sin(x/2) is about x/2 - (x/2)^3/6
+-    # so sin(x/2)/x is about 1/2 - (x*x)/48
+-    sin_half_angles_over_angles[small_angles] = (
+-        0.5 - (angles[small_angles] * angles[small_angles]) / 48
+-    )
+-    return quaternions[..., :3] / sin_half_angles_over_angles
+diff --git a/hora/tasks/base/__init__.py b/hora/tasks/base/__init__.py
+deleted file mode 100644
+index ca0eafa..0000000
+--- a/hora/tasks/base/__init__.py
++++ /dev/null
+@@ -1,27 +0,0 @@
+-# Copyright (c) 2018-2021, NVIDIA Corporation
+-# All rights reserved.
+-#
+-# Redistribution and use in source and binary forms, with or without
+-# modification, are permitted provided that the following conditions are met:
+-#
+-# 1. Redistributions of source code must retain the above copyright notice, this
+-#    list of conditions and the following disclaimer.
+-#
+-# 2. Redistributions in binary form must reproduce the above copyright notice,
+-#    this list of conditions and the following disclaimer in the documentation
+-#    and/or other materials provided with the distribution.
+-#
+-# 3. Neither the name of the copyright holder nor the names of its
+-#    contributors may be used to endorse or promote products derived from
+-#    this software without specific prior written permission.
+-#
+-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+-# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+-# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+-# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+-# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+-# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+-# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+-# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+diff --git a/hora/tasks/base/vec_task.py b/hora/tasks/base/vec_task.py
+deleted file mode 100644
+index 7c35e0a..0000000
+--- a/hora/tasks/base/vec_task.py
++++ /dev/null
+@@ -1,440 +0,0 @@
+-# --------------------------------------------------------
+-# In-Hand Object Rotation via Rapid Motor Adaptation
+-# https://arxiv.org/abs/2210.04887
+-# Copyright (c) 2022 Haozhi Qi
+-# Licensed under The MIT License [see LICENSE for details]
+-# --------------------------------------------------------
+-# Based on: IsaacGymEnvs
+-# Copyright (c) 2018-2022, NVIDIA Corporation
+-# Licence under BSD 3-Clause License
+-# https://github.com/NVIDIA-Omniverse/IsaacGymEnvs/
+-# --------------------------------------------------------
+-# Modified by Wonik Robotics (2025)
+-# Adaptations for Allegro Hand V4 deployment
+-# --------------------------------------------------------
+-
+-from isaacgym import gymapi
+-
+-import abc
+-import sys
+-import gym
+-import torch
+-import numpy as np
+-
+-from abc import ABC
+-from gym import spaces
+-from typing import Dict, Any, Tuple
+-
+-
+-class Env(ABC):
+-    def __init__(
+-        self,
+-        config: Dict[str, Any],
+-        sim_device: str,
+-        graphics_device_id: int,
+-        headless: bool,
+-    ):
+-        """Initialise the env.
+-
+-        Args:
+-            config: the configuration dictionary.
+-            sim_device: the device to simulate physics on. eg. 'cuda:0' or 'cpu'
+-            graphics_device_id: the device ID to render with.
+-            headless: Set to False to disable viewer rendering.
+-        """
+-
+-        split_device = sim_device.split(":")
+-        self.device_type = split_device[0]
+-        self.device_id = int(split_device[1]) if len(split_device) > 1 else 0
+-
+-        self.device = "cpu"
+-        if config["sim"]["use_gpu_pipeline"]:
+-            if self.device_type.lower() == "cuda" or self.device_type.lower() == "gpu":
+-                self.device = "cuda" + ":" + str(self.device_id)
+-            else:
+-                print(
+-                    "GPU Pipeline can only be used with GPU simulation. Forcing CPU Pipeline."
+-                )
+-                config["sim"]["use_gpu_pipeline"] = False
+-
+-        self.rl_device = config.get("rl_device", "cuda:0")
+-
+-        # Rendering
+-        # if training in a headless mode
+-        self.headless = headless
+-
+-        enable_camera_sensors = config.get("enableCameraSensors", False)
+-        self.graphics_device_id = graphics_device_id
+-        if not enable_camera_sensors and self.headless:
+-            self.graphics_device_id = -1
+-
+-        self.num_environments = config["env"]["numEnvs"]
+-        self.num_observations = config["env"]["numObservations"]
+-        self.num_actions = config["env"]["numActions"]
+-
+-        self.obs_space = spaces.Box(
+-            np.ones(self.num_obs, dtype=np.float32) * -np.Inf,
+-            np.ones(self.num_obs, dtype=np.float32) * np.Inf,
+-        )
+-        self.act_space = spaces.Box(
+-            np.ones(self.num_actions, dtype=np.float32) * -1.0,
+-            np.ones(self.num_actions, dtype=np.float32) * 1.0,
+-        )
+-
+-        self.clip_obs = config["env"].get("clipObservations", np.Inf)
+-        self.clip_actions = config["env"].get("clipActions", np.Inf)
+-
+-        # controller
+-        controller_config = config["env"]["controller"]
+-        self.torque_control = controller_config["torque_control"]
+-        self.p_gain = controller_config["pgain"]
+-        self.d_gain = controller_config["dgain"]
+-        self.control_freq_inv = controller_config["controlFrequencyInv"]
+-
+-    @abc.abstractmethod
+-    def _allocate_buffers(self):
+-        """Create torch buffers for observations, rewards, actions dones and any additional data."""
+-
+-    @abc.abstractmethod
+-    def step(
+-        self, actions: torch.Tensor
+-    ) -> Tuple[Dict[str, torch.Tensor], torch.Tensor, torch.Tensor, Dict[str, Any]]:
+-        """Step the physics of the environment.
+-
+-        Args:
+-            actions: actions to apply
+-        Returns:
+-            Observations, rewards, resets, info
+-            Observations are dict of observations (currently only one member called 'obs')
+-        """
+-
+-    @abc.abstractmethod
+-    def reset(self) -> Dict[str, torch.Tensor]:
+-        """Reset the environment.
+-        Returns:
+-            Observation dictionary
+-        """
+-
+-    @property
+-    def observation_space(self) -> gym.Space:
+-        """Get the environment's observation space."""
+-        return self.obs_space
+-
+-    @property
+-    def action_space(self) -> gym.Space:
+-        """Get the environment's action space."""
+-        return self.act_space
+-
+-    @property
+-    def num_envs(self) -> int:
+-        """Get the number of environments."""
+-        return self.num_environments
+-
+-    @property
+-    def num_acts(self) -> int:
+-        """Get the number of actions in the environment."""
+-        return self.num_actions
+-
+-    @property
+-    def num_obs(self) -> int:
+-        """Get the number of observations in the environment."""
+-        return self.num_observations
+-
+-
+-class VecTask(Env):
+-
+-    def __init__(self, config, sim_device, graphics_device_id, headless):
+-        """Initialise the `VecTask`.
+-
+-        Args:
+-            config: config dictionary for the environment.
+-            sim_device: the device to simulate physics on. eg. 'cuda:0' or 'cpu'
+-            graphics_device_id: the device ID to render with.
+-            headless: Set to False to disable viewer rendering.
+-        """
+-        super().__init__(config, sim_device, graphics_device_id, headless)
+-
+-        self.sim_params = self._parse_sim_params(
+-            config["physics_engine"], config["sim"]
+-        )
+-        if config["physics_engine"] == "physx":
+-            self.physics_engine = gymapi.SIM_PHYSX
+-        elif config["physics_engine"] == "flex":
+-            self.physics_engine = gymapi.SIM_FLEX
+-        else:
+-            msg = f"Invalid physics engine backend: {config['physics_engine']}"
+-            raise ValueError(msg)
+-
+-        # optimization flags for pytorch JIT
+-        torch._C._jit_set_profiling_mode(False)  # noqa
+-        torch._C._jit_set_profiling_executor(False)  # noqa
+-
+-        self.gym = gymapi.acquire_gym()
+-        self._allocate_buffers()
+-        # create envs, sim and viewer
+-        self.create_sim()
+-        self.gym.prepare_sim(self.sim)
+-        self._set_viewer()
+-        self.obs_dict = {}
+-
+-    def _set_viewer(self):
+-        self.enable_viewer_sync = True
+-        self.viewer = None
+-
+-        # if running with a viewer, set up keyboard shortcuts and camera
+-        if not self.headless:
+-            # subscribe to keyboard shortcuts
+-            self.viewer = self.gym.create_viewer(self.sim, gymapi.CameraProperties())
+-            self.gym.subscribe_viewer_keyboard_event(
+-                self.viewer, gymapi.KEY_ESCAPE, "QUIT"
+-            )
+-            self.gym.subscribe_viewer_keyboard_event(
+-                self.viewer, gymapi.KEY_V, "toggle_viewer_sync"
+-            )
+-
+-            # set the camera position based on up axis
+-            sim_params = self.gym.get_sim_params(self.sim)
+-            if sim_params.up_axis == gymapi.UP_AXIS_Z:
+-                cam_pos = gymapi.Vec3(20.0, 25.0, 3.0)
+-                cam_target = gymapi.Vec3(10.0, 15.0, 0.0)
+-            else:
+-                cam_pos = gymapi.Vec3(20.0, 3.0, 25.0)
+-                cam_target = gymapi.Vec3(10.0, 0.0, 15.0)
+-
+-            self.gym.viewer_camera_look_at(self.viewer, None, cam_pos, cam_target)
+-
+-    def _allocate_buffers(self):
+-        """Allocate the observation, states, etc. buffers.
+-
+-        These are what is used to set observations and states in the environment classes which
+-        inherit from this one, and are read in `step` and other related functions.
+-
+-        """
+-        # allocate buffers
+-        self.obs_buf = torch.zeros((self.num_envs, self.num_obs), device=self.device, dtype=torch.float)
+-        self.obs_buf_lag_history = torch.zeros(
+-            (self.num_envs, 80, self.num_obs // 3), 
+-            device=self.device,
+-            dtype=torch.float,
+-        )
+-        self.rew_buf = torch.zeros(self.num_envs, device=self.device, dtype=torch.float)
+-        self.reset_buf = torch.ones(self.num_envs, device=self.device, dtype=torch.long)
+-        self.at_reset_buf = torch.ones(self.num_envs, device=self.device, dtype=torch.long)
+-        self.timeout_buf = torch.zeros(self.num_envs, device=self.device, dtype=torch.long)
+-        self.progress_buf = torch.zeros(self.num_envs, device=self.device, dtype=torch.long)
+-        self.extras = {}
+-        self._allocate_task_buffer(self.num_envs)
+-
+-    def _allocate_task_buffer(self, num_envs):
+-        pass
+-
+-    def set_sim_params_up_axis(self, sim_params: gymapi.SimParams, axis: str) -> int:
+-        """Set gravity based on up axis and return axis index.
+-
+-        Args:
+-            sim_params: sim params to modify the axis for.
+-            axis: axis to set sim params for.
+-        Returns:
+-            axis index for up axis.
+-        """
+-        if axis == "z":
+-            sim_params.up_axis = gymapi.UP_AXIS_Z
+-            sim_params.gravity.x = 0
+-            sim_params.gravity.y = 0
+-            sim_params.gravity.z = -9.81
+-            return 2
+-        return 1
+-
+-    def create_sim(self):
+-        self.dt = self.sim_params.dt
+-        self.up_axis_idx = self.set_sim_params_up_axis(self.sim_params, self.up_axis)
+-        self.sim = self.gym.create_sim(
+-            self.device_id,
+-            self.graphics_device_id,
+-            self.physics_engine,
+-            self.sim_params,
+-        )
+-        if self.sim is None:
+-            print("*** Failed to create sim")
+-            quit()
+-        self._create_envs(self.num_envs, self.config["env"]["envSpacing"], int(np.sqrt(self.num_envs)))
+-
+-    @abc.abstractmethod
+-    def _create_envs(self, num_envs, spacing, num_per_row):
+-        """Create Training Environments
+-        Args:
+-            num_envs: number of parallel environments
+-            spacing: space between different envs
+-            num_per_row:
+-        """
+-
+-    @abc.abstractmethod
+-    def pre_physics_step(self, actions: torch.Tensor):
+-        """Apply the actions to the environment (eg by setting torques, position targets).
+-
+-        Args:
+-            actions: the actions to apply
+-        """
+-
+-    @abc.abstractmethod
+-    def post_physics_step(self):
+-        """Compute reward and observations, reset any environments that require it."""
+-
+-    def step(
+-        self, actions: torch.Tensor
+-    ) -> Tuple[Dict[str, torch.Tensor], torch.Tensor, torch.Tensor, Dict[str, Any]]:
+-        """Step the physics of the environment.
+-
+-        Args:
+-            actions: actions to apply
+-        Returns:
+-            Observations, rewards, resets, info
+-            Observations are dict of observations (currently only one member called 'obs')
+-        """
+-        action_tensor = torch.clamp(actions, -self.clip_actions, self.clip_actions) # 1.0
+-        # apply actions
+-        self.pre_physics_step(action_tensor)
+-
+-        # step physics and render each frame
+-        for i in range(self.control_freq_inv):
+-            if self.device == "cpu":
+-                self.gym.fetch_results(self.sim, True)
+-            self.update_low_level_control()
+-            self.gym.simulate(self.sim)
+-            self.render()
+-
+-        # fill time out buffer
+-        self.timeout_buf = torch.where(
+-            torch.greater_equal(self.progress_buf, self.max_episode_length - 1),
+-            torch.ones_like(self.timeout_buf),
+-            torch.zeros_like(self.timeout_buf),
+-        )
+-
+-        # compute observations, rewards, resets, ...
+-        self.post_physics_step()
+-        self.extras["time_outs"] = self.timeout_buf.to(self.rl_device)
+-        self.obs_dict["obs"] = torch.clamp(
+-            self.obs_buf, -self.clip_obs, self.clip_obs
+-        ).to(self.rl_device)
+-        return (
+-            self.obs_dict,
+-            self.rew_buf.to(self.rl_device),
+-            self.reset_buf.to(self.rl_device),
+-            self.extras,
+-        )
+-
+-    def update_low_level_control(self):
+-        pass
+-
+-    def zero_actions(self) -> torch.Tensor:
+-        """Returns a buffer with zero actions.
+-
+-        Returns:
+-            A buffer of zero torch actions
+-        """
+-        actions = torch.zeros(
+-            [self.num_envs, self.num_actions],
+-            dtype=torch.float32,
+-            device=self.rl_device,
+-        )
+-
+-        return actions
+-
+-    def reset(self) -> Dict[str, torch.Tensor]:
+-        """Reset the environment.
+-        Returns:
+-            Observation dictionary
+-        """
+-        env_ids = self.reset_buf.nonzero().squeeze(-1)
+-        self.reset_idx(env_ids)
+-        zero_actions = self.zero_actions()
+-        # step the simulator
+-        self.step(zero_actions)
+-        self.obs_dict["obs"] = torch.clamp(
+-            self.obs_buf, -self.clip_obs, self.clip_obs
+-        ).to(self.rl_device)
+-        return self.obs_dict
+-
+-    def reset_idx(self, env_ids):
+-        raise NotImplementedError
+-
+-    def render(self):
+-        """Draw the frame to the viewer, and check for keyboard events."""
+-        if self.viewer:
+-            # check for window closed
+-            if self.gym.query_viewer_has_closed(self.viewer):
+-                sys.exit()
+-
+-            # check for keyboard events
+-            for evt in self.gym.query_viewer_action_events(self.viewer):
+-                if evt.action == "QUIT" and evt.value > 0:
+-                    sys.exit()
+-                elif evt.action == "toggle_viewer_sync" and evt.value > 0:
+-                    self.enable_viewer_sync = not self.enable_viewer_sync
+-
+-            # fetch results
+-            if self.device != "cpu":
+-                self.gym.fetch_results(self.sim, True)
+-
+-            # step graphics
+-            if self.enable_viewer_sync:
+-                self.gym.step_graphics(self.sim)
+-                self.gym.draw_viewer(self.viewer, self.sim, True)
+-                # Wait for dt to elapse in real time.
+-                # This synchronizes the physics simulation with the rendering rate.
+-                self.gym.sync_frame_time(self.sim)
+-            else:
+-                self.gym.poll_viewer_events(self.viewer)
+-
+-    def _parse_sim_params(self, physics_engine: str, config_sim: Dict[str, Any]) -> gymapi.SimParams:
+-        """Parse the config dictionary for physics stepping settings.
+-
+-        Args:
+-            physics_engine: which physics engine to use. "physx" or "flex"
+-            config_sim: dict of sim configuration parameters
+-        Returns
+-            IsaacGym SimParams object with updated settings.
+-        """
+-        sim_params = gymapi.SimParams()
+-
+-        # check correct up-axis
+-        if config_sim["up_axis"] not in ["z", "y"]:
+-            msg = f"Invalid physics up-axis: {config_sim['up_axis']}"
+-            print(msg)
+-            raise ValueError(msg)
+-
+-        # assign general sim parameters
+-        sim_params.dt = config_sim["dt"]
+-        sim_params.num_client_threads = config_sim.get("num_client_threads", 0)
+-        sim_params.use_gpu_pipeline = config_sim["use_gpu_pipeline"]
+-        sim_params.substeps = config_sim.get("substeps", 2)
+-
+-        # assign up-axis
+-        if config_sim["up_axis"] == "z":
+-            sim_params.up_axis = gymapi.UP_AXIS_Z
+-        else:
+-            sim_params.up_axis = gymapi.UP_AXIS_Y
+-
+-        # assign gravity
+-        sim_params.gravity = gymapi.Vec3(*config_sim["gravity"])
+-
+-        # configure physics parameters
+-        if physics_engine == "physx":
+-            # set the parameters
+-            if "physx" in config_sim:
+-                for opt in config_sim["physx"].keys():
+-                    if opt == "contact_collection":
+-                        setattr(
+-                            sim_params.physx,
+-                            opt,
+-                            gymapi.ContactCollection(config_sim["physx"][opt]),
+-                        )
+-                    else:
+-                        setattr(sim_params.physx, opt, config_sim["physx"][opt])
+-        else:
+-            # set the parameters
+-            if "flex" in config_sim:
+-                for opt in config_sim["flex"].keys():
+-                    setattr(sim_params.flex, opt, config_sim["flex"][opt])
+-
+-        return sim_params
+diff --git a/scripts/train_s1.sh b/scripts/train_s1.sh
+index 4a72b25..0501c18 100755
+--- a/scripts/train_s1.sh
++++ b/scripts/train_s1.sh
+@@ -11,9 +11,9 @@ EXTRA_ARGS_SLUG=${EXTRA_ARGS// /_}
+ echo extra "${EXTRA_ARGS}"
+ 
+ CUDA_VISIBLE_DEVICES=${GPUS} \
+-python train.py task=RightAllegroHandHora headless=True seed=${SEED} \
++python train.py task=LeftAllegroHandHora headless=True seed=${SEED} \
+ task.env.forceScale=2 task.env.randomForceProbScalar=0.25 \
+ train.algo=PPO \
+ train.ppo.priv_info=True train.ppo.proprio_adapt=False \
+-train.ppo.output_name=RightAllegroHandHora/"${CACHE}" \
++train.ppo.output_name=LeftAllegroHandHora/"${CACHE}" \
+ ${EXTRA_ARGS}
+diff --git a/scripts/train_s2.sh b/scripts/train_s2.sh
+index a232ecc..c57cff6 100755
+--- a/scripts/train_s2.sh
++++ b/scripts/train_s2.sh
+@@ -11,12 +11,12 @@ EXTRA_ARGS_SLUG=${EXTRA_ARGS// /_}
+ echo extra "${EXTRA_ARGS}"
+ 
+ CUDA_VISIBLE_DEVICES=${GPUS} \
+-python train.py task=RightAllegroHandHora headless=True seed=${SEED} \
++python train.py task=LeftAllegroHandHora headless=False seed=${SEED} \
+ task.env.numEnvs=20000 \
+ task.env.forceScale=2 task.env.randomForceProbScalar=0.25 \
+ train.algo=ProprioAdapt \
+ train.ppo.priv_info=True train.ppo.proprio_adapt=True \
+-train.ppo.output_name=RightAllegroHandHora/"${CACHE}" \
+-checkpoint=outputs/RightAllegroHandHora/"${CACHE}"/stage1_nn/best.pth \
++train.ppo.output_name=LeftAllegroHandHora/"${CACHE}" \
++checkpoint=outputs/LeftAllegroHandHora/"${CACHE}"/stage1_nn/best.pth \
+ ${EXTRA_ARGS}
+ 
+diff --git a/train.py b/train.py
+index 98d7d0e..910003c 100644
+--- a/train.py
++++ b/train.py
+@@ -10,10 +10,34 @@
+ # https://github.com/NVIDIA-Omniverse/IsaacGymEnvs/
+ # --------------------------------------------------------
+ # Modified by Wonik Robotics (2025)
+-# Adaptations for Allegro Hand V4 deployment
++# Ported from IsaacGym to IsaacLab (2026): Isaac Sim must be launched via
++# `AppLauncher` before any `isaaclab`-touching import happens -- including the
++# `from hora.tasks import ...` import this script used to do at module scope
++# under IsaacGym. `headless`/`sim_device` are read straight out of `sys.argv`
++# here (matching Hydra's `key=value` override syntax) since Hydra itself
++# hasn't parsed the config yet at this point and the two CLI styles don't mix.
+ # --------------------------------------------------------
+ 
+-import isaacgym
++import sys
++
++from isaaclab.app import AppLauncher
++
++
++def _cli_override(key: str, default: str) -> str:
++    prefix = f"{key}="
++    for arg in sys.argv[1:]:
++        if arg.startswith(prefix):
++            return arg[len(prefix):]
++    return default
++
++
++_headless = _cli_override("headless", "False").lower() == "true"
++_sim_device = _cli_override("sim_device", "cuda:0")
++
++app_launcher = AppLauncher(headless=_headless, device=_sim_device)
++simulation_app = app_launcher.app
++
++# ---- everything below may safely import isaaclab ----
+ 
+ import os
+ import hydra
+@@ -24,7 +48,7 @@ from hydra.utils import to_absolute_path
+ 
+ from hora.algo.ppo.ppo import PPO
+ from hora.algo.padapt.padapt import ProprioAdapt
+-from hora.tasks import isaacgym_task_map
++from hora.tasks import isaaclab_task_map
+ from hora.utils.reformat import omegaconf_to_dict, print_dict
+ from hora.utils.misc import set_np_formatting, set_seed, git_hash, git_diff_config
+ 
+@@ -80,7 +104,7 @@ def main(config: DictConfig):
+ 
+ 
+     cprint("Start Building the Environment", "green", attrs=["bold"])
+-    env = isaacgym_task_map[config.task_name](
++    env = isaaclab_task_map[config.task_name](
+         config=omegaconf_to_dict(config.task),
+         sim_device=config.sim_device,
+         graphics_device_id=config.graphics_device_id,
+@@ -129,3 +153,4 @@ def main(config: DictConfig):
+ 
+ if __name__ == "__main__":
+     main()
++    simulation_app.close()
