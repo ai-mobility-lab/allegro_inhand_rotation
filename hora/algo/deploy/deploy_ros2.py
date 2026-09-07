@@ -60,6 +60,21 @@ def _reorder_timr2imrt(timr):
     return np.concatenate([timr[4:16], timr[0:4]]).astype(np.float64)
 
 
+# The policy (trained via hora/tasks/isaaclab/allegro_hand_hora_env.py) acts and
+# observes in IsaacLab's DOF order, not the "hora order" (index, thumb, middle, ring
+# blocks of 4) used everywhere else in this file -- IsaacLab's URDF->USD import
+# reorders the Allegro asset's DOF layout to joint-rank-major (each finger's Nth joint
+# grouped together) instead of IsaacGym's finger-major layout. See
+# hora/tasks/isaaclab/allegro_hand_grasp_env.py's CANONICAL_POSE comment for the
+# joint-name derivation of this permutation. It's a 4x4 transpose, hence self-inverse:
+# the same index array converts sim-order<->hora-order in either direction.
+_HORA_SIM_PERM = [0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15]
+
+
+def _hora_sim_swap(x):
+    return x[..., _HORA_SIM_PERM]
+
+
 # =========================================================
 # Control agent (Timer-based)
 # =========================================================
@@ -140,21 +155,25 @@ class HardwarePlayer:
             obses.view(-1), self.allegro_dof_lower, self.allegro_dof_upper
         ).view(1, 16)
 
+        # Buffers below feed the model directly, so they must be in sim order.
+        cur_obs_sim = _hora_sim_swap(cur_obs)
+        cur_target_sim = _hora_sim_swap(self.cur_target)
+
         # 2) Roll obs_buf (96 = 32*3)
         #    [0:64] <- [32:96],  [64:80] <- cur_obs,  [80:96] <- cur_target
         #    ⚠️ To prevent overlap: first clone() the source part to store it temporarily
         src64 = self.obs_buf[:, 32:96].clone()     # (1,64)
         self.obs_buf[:, 0:64] = src64              # Pull to the front 64 cells
-        self.obs_buf[:, 64:80] = cur_obs           # Current observation (normalized)
-        self.obs_buf[:, 80:96] = self.cur_target   # Latest target (rad)
+        self.obs_buf[:, 64:80] = cur_obs_sim       # Current observation (normalized)
+        self.obs_buf[:, 80:96] = cur_target_sim    # Latest target (rad)
 
         # 3) Roll proprio_hist_buf (T=30)
         #    [:, 0:-1, :] <- [:, 1:, :];  at the last step [cur_obs | cur_target]
         #    ⚠️ To prevent overlap within the same tensor: clone() the source
         src_hist = self.proprio_hist_buf[:, 1:, :].clone()  # (1,29,32)
         self.proprio_hist_buf[:, 0:-1, :] = src_hist
-        self.proprio_hist_buf[:, -1, :16] = cur_obs
-        self.proprio_hist_buf[:, -1, 16:32] = self.cur_target
+        self.proprio_hist_buf[:, -1, :16] = cur_obs_sim
+        self.proprio_hist_buf[:, -1, 16:32] = cur_target_sim
 
     # ---------- timer callback ----------
     @torch.inference_mode()
@@ -171,8 +190,10 @@ class HardwarePlayer:
         }
         action = torch.clamp(self.model.act_inference(input_dict), -1.0, 1.0)
 
-        # 3) update target
-        self._pre_physics_step(action)
+        # 3) update target (model outputs sim order; the rest of this class works in
+        #    hora order, same as `allegro_dof_lower/upper` and `init_pose` below)
+        action_hora = _hora_sim_swap(action)
+        self._pre_physics_step(action_hora)
 
         # 4) publish command (convert when sending to CPU only)
         cmd = self.cur_target.detach().to("cpu").numpy()[0]
@@ -234,14 +255,16 @@ class HardwarePlayer:
         obs_q = torch.from_numpy(hora_q.astype(np.float32)).to(self.device)
         self._last_obs_q = obs_q
 
-        # Initialize buffers
+        # Initialize buffers (in sim order — these feed the model, same as _post_physics_step)
         cur_obs_buf = self._unscale(obs_q, self.allegro_dof_lower, self.allegro_dof_upper)[None]
         self.prev_target = obs_q[None]
+        cur_obs_buf_sim = _hora_sim_swap(cur_obs_buf)
+        prev_target_sim = _hora_sim_swap(self.prev_target)
         for i in range(3):
-            self.obs_buf[:, i*32:i*32+16] = cur_obs_buf
-            self.obs_buf[:, i*32+16:i*32+32] = self.prev_target
-        self.proprio_hist_buf[:, :, :16] = cur_obs_buf
-        self.proprio_hist_buf[:, :, 16:32] = self.prev_target
+            self.obs_buf[:, i*32:i*32+16] = cur_obs_buf_sim
+            self.obs_buf[:, i*32+16:i*32+32] = prev_target_sim
+        self.proprio_hist_buf[:, :, :16] = cur_obs_buf_sim
+        self.proprio_hist_buf[:, :, 16:32] = prev_target_sim
 
         # Register Timer (accurate frequency)
         period = 1.0 / self.hz

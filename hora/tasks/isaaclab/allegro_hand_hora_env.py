@@ -79,6 +79,27 @@ def _parse_primitive_geometry(urdf_path: str) -> dict:
     raise ValueError(f"{urdf_path}: no <box>/<cylinder>/<sphere> collision geometry found")
 
 
+def _parse_mesh_geometry(urdf_path: str) -> dict:
+    """Read the single `<mesh>` visual geometry out of one of the flat
+    `assets/{ycb,dextouch}/*.urdf` object files (e.g. `assets/ycb/006_mustard_bottle.urdf`,
+    referencing `006_mustard_bottle/google_16k/textured.obj`).
+
+    Unlike the primitive shapes, these have no simple analytic form -- they're spawned
+    by pre-converting the referenced OBJ/STL mesh to USD via IsaacLab's `MeshConverter`
+    (see `AllegroHandHoraEnv._get_mesh_usd_path`) rather than through the URDF->USD
+    converter, for the same `RigidObject` composition-breakage reason documented on
+    `_build_object_cfg`. The collision mesh referenced separately in the URDF (a VHACD
+    decomposition) is not used; `MeshConverter` instead derives an approximate convex
+    decomposition straight from the visual mesh, which is simpler and matches the
+    `scripts/tools/convert_mesh.py` usage pattern IsaacLab itself documents.
+    """
+    root = ET.parse(urdf_path).getroot()
+    mesh = root.find("./link/visual/geometry/mesh")
+    mesh_path = os.path.normpath(os.path.join(os.path.dirname(urdf_path), mesh.get("filename")))
+    scale = tuple(float(v) for v in mesh.get("scale", "1.0 1.0 1.0").split())
+    return {"kind": "mesh", "mesh_path": mesh_path, "scale": scale}
+
+
 @configclass
 class EventCfg:
     """Domain randomization applied once at env creation (`mode="startup"`).
@@ -390,11 +411,57 @@ class AllegroHandHoraEnv(DirectRLEnv):
         light_cfg = sim_utils.DomeLightCfg(intensity=2000.0, color=(0.75, 0.75, 0.75))
         light_cfg.func("/World/Light", light_cfg)
 
+    def _get_mesh_usd_path(
+        self,
+        mesh_path: str,
+        rigid_props: sim_utils.RigidBodyPropertiesCfg,
+        collision_props: sim_utils.CollisionPropertiesCfg,
+        mass_props: sim_utils.MassPropertiesCfg,
+    ) -> str:
+        """Lazily convert an OBJ/STL mesh (from a `assets/{ycb,dextouch}/*.urdf`
+        object's `<visual><mesh>`) to USD via IsaacLab's `MeshConverter`, memoized per
+        mesh file for the lifetime of this env instance -- multiple envs (and multiple
+        scale buckets) spawning the same object all reference the one converted file.
+
+        `MeshConverter` is run eagerly here (it does the conversion synchronously in
+        its own `__init__`, not lazily like `UrdfConverter`), same as the one-off CLI
+        usage in IsaacLab's own `scripts/tools/convert_mesh.py`. Caching is handled the
+        same way as the hand's URDF conversion (`_stable_usd_cache_dir`): a fixed
+        `usd_dir` next to the source file lets `AssetConverterBase`'s content-hash check
+        skip reconversion on repeat runs.
+
+        `rigid_props`/`collision_props`/`mass_props` are baked in at conversion time
+        (applied to the converted file's top-level Xform) rather than left to the
+        per-env `UsdFileCfg` spawn: unlike the URDF converter, `MeshConverter` never
+        applies `RigidBodyAPI`/mass/collision schemas unless told to at conversion
+        time, and `UsdFileCfg`'s own `rigid_props` etc. only *modify* an existing
+        schema's attribute values at spawn time -- they don't apply it for the first
+        time. Skipping this bake-in is what raised "Failed to find a rigid body...
+        Please ensure that the prim has 'USD RigidBodyAPI' applied" the first time
+        this was tried without it. Safe to share across envs/scale-buckets since
+        these three configs don't vary per env (only `obj_scale`, applied separately
+        via `UsdFileCfg.scale` per spawn, does).
+        """
+        if mesh_path not in self._mesh_usd_cache:
+            converter = sim_utils.MeshConverter(
+                sim_utils.MeshConverterCfg(
+                    asset_path=mesh_path,
+                    usd_dir=_stable_usd_cache_dir(mesh_path),
+                    mesh_collision_props=sim_utils.ConvexDecompositionPropertiesCfg(),
+                    rigid_props=rigid_props,
+                    collision_props=collision_props,
+                    mass_props=mass_props,
+                )
+            )
+            self._mesh_usd_cache[mesh_path] = converter.usd_path
+        return self._mesh_usd_cache[mesh_path]
+
     def _build_object_cfg(self) -> RigidObjectCfg:
         num_envs = self.cfg.scene.num_envs
         num_scales = len(self.randomize_scale_list) if self.randomize_scale else 1
         per_env_scale = np.zeros(num_envs, dtype=np.float32)
         per_env_asset_cfgs = []
+        self._mesh_usd_cache = {}
         object_rigid_props = hora_sim_cfg.build_rigid_body_props(self.cfg.hora_sim_dict, disable_gravity=False)
         object_collision_props = hora_sim_cfg.build_collision_props(self.cfg.hora_sim_dict)
         # matches the URDFs' own `<mass value="0.05"/>` -- only a placeholder default
@@ -410,7 +477,12 @@ class AllegroHandHoraEnv(DirectRLEnv):
         # confirmed empty/invisible both via raw `Usd.Stage.Open` and by opening the
         # converted file directly in Kit on an empty stage. `Articulation` (the hand)
         # renders fine through this same pattern; `RigidObject` (the object) doesn't --
-        # spawning shapes natively sidesteps the whole broken composition path.
+        # spawning shapes natively sidesteps the whole broken composition path. Mesh
+        # objects (ycb/dextouch) can't be represented as a native shape prim, so those
+        # go through `MeshConverter` instead (`_get_mesh_usd_path`) and are spawned as
+        # a `UsdFileCfg` -- `MeshConverter`'s flat Xform/geometry USD output doesn't hit
+        # the same broken payload composition, since it never goes through the URDF
+        # importer at all.
         for i in range(num_envs):
             obj_scale = self.base_obj_scale
             if self.randomize_scale:
@@ -431,8 +503,21 @@ class AllegroHandHoraEnv(DirectRLEnv):
                 shape_cfg = sim_utils.CylinderCfg(
                     radius=spec["radius"] * obj_scale, height=spec["height"] * obj_scale, **shape_kwargs
                 )
-            else:
+            elif spec["kind"] == "sphere":
                 shape_cfg = sim_utils.SphereCfg(radius=spec["radius"] * obj_scale, **shape_kwargs)
+            else:
+                mx, my, mz = spec["scale"]
+                # rigid/collision/mass are baked into the converted USD itself here
+                # (see `_get_mesh_usd_path`), not passed via `shape_kwargs` -- unlike
+                # the native shape prims below, `UsdFileCfg`'s `rigid_props` etc. can
+                # only modify an already-applied schema, not apply one for the first
+                # time.
+                shape_cfg = sim_utils.UsdFileCfg(
+                    usd_path=self._get_mesh_usd_path(
+                        spec["mesh_path"], object_rigid_props, object_collision_props, object_mass_props
+                    ),
+                    scale=(mx * obj_scale, my * obj_scale, mz * obj_scale),
+                )
             per_env_asset_cfgs.append(shape_cfg)
         self._object_scales = torch.from_numpy(per_env_scale).to(self.device)
 
@@ -715,8 +800,43 @@ class AllegroHandHoraEnv(DirectRLEnv):
                     self.object_type_prob += [raw_prob[p_id] / len(names) for _ in names]
                     break
             else:
-                self.object_type_list += [prim]
-                self.object_type_prob += [raw_prob[p_id]]
+                # mesh-based object sets: flat `assets/{ycb,dextouch}/*.urdf`, one file
+                # per object (no per-subset subdirectory like the primitives have).
+                # `type: "ycb"` (or `"dextouch"`) pulls in the whole set; naming one
+                # object by its urdf stem -- e.g. `type: "ycb_006_mustard_bottle"` or
+                # `"dextouch_hourglass"` -- restricts to just that object. Either form
+                # can be mixed with the other entries via "+", e.g.
+                # `"ycb_006_mustard_bottle+dextouch_hourglass+cuboid_default"`.
+                for mesh_set in ("ycb", "dextouch"):
+                    prefix = f"{mesh_set}_"
+                    if prim != mesh_set and not prim.startswith(prefix):
+                        continue
+                    if prim == mesh_set:
+                        files = sorted(
+                            f
+                            for f in glob(os.path.join(REPO_ROOT, f"assets/{mesh_set}/*.urdf"))
+                            if not os.path.basename(f).startswith("_")
+                        )
+                    else:
+                        object_name = prim[len(prefix) :]
+                        object_file = os.path.join(REPO_ROOT, f"assets/{mesh_set}/{object_name}.urdf")
+                        if not os.path.isfile(object_file):
+                            raise FileNotFoundError(
+                                f"object.type entry {prim!r}: no such {mesh_set} object -- expected "
+                                f"{object_file} to exist"
+                            )
+                        files = [object_file]
+                    # keyed by urdf stem (not a running index) so multiple single-object
+                    # entries from the same mesh_set don't collide with each other.
+                    names = [f"{mesh_set}_{os.path.splitext(os.path.basename(f))[0]}" for f in files]
+                    self.object_type_list += names
+                    for name, f in zip(names, files):
+                        self.object_shape_specs[name] = _parse_mesh_geometry(f)
+                    self.object_type_prob += [raw_prob[p_id] / len(names) for _ in names]
+                    break
+                else:
+                    self.object_type_list += [prim]
+                    self.object_type_prob += [raw_prob[p_id]]
 
         assert len(self.object_type_list) == len(self.object_type_prob)
 

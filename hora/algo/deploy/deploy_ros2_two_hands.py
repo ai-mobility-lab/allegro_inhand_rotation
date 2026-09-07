@@ -108,6 +108,22 @@ def _reorder_timr2imrt(timr):
     return np.concatenate([timr[4:16], timr[0:4]]).astype(np.float64)
 
 
+# The policy (trained via hora/tasks/isaaclab/allegro_hand_hora_env.py) acts and
+# observes in IsaacLab's DOF order, not the "hora order" (index, thumb, middle, ring
+# blocks of 4, or their left-hand mirror) used everywhere else in this file --
+# IsaacLab's URDF->USD import reorders the Allegro asset's DOF layout to
+# joint-rank-major (each finger's Nth joint grouped together) instead of IsaacGym's
+# finger-major layout, for both hands (same joint-naming topology). See
+# hora/tasks/isaaclab/allegro_hand_grasp_env.py's CANONICAL_POSE comment for the
+# joint-name derivation of this permutation. It's a 4x4 transpose, hence self-inverse:
+# the same index array converts sim-order<->hora-order in either direction.
+_HORA_SIM_PERM = [0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15]
+
+
+def _hora_sim_swap(x):
+    return x[..., _HORA_SIM_PERM]
+
+
 # =========================================================
 # Control agent (Timer-based, two hands)
 # =========================================================
@@ -222,17 +238,21 @@ class HardwarePlayerTwoHands:
             obses.view(-1), self.allegro_dof_lower, self.allegro_dof_upper
         ).view(1, 16)
 
+        # Buffers below feed the model directly, so they must be in sim order.
+        cur_obs_sim = _hora_sim_swap(cur_obs)
+        cur_target_sim = _hora_sim_swap(cur_target)
+
         # 2) Roll obs_buf (96 = 32*3)
         src64 = obs_buf[:, 32:96].clone()
         obs_buf[:, 0:64] = src64
-        obs_buf[:, 64:80] = cur_obs
-        obs_buf[:, 80:96] = cur_target
+        obs_buf[:, 64:80] = cur_obs_sim
+        obs_buf[:, 80:96] = cur_target_sim
 
         # 3) Roll proprio_hist_buf (T=30)
         src_hist = proprio_hist_buf[:, 1:, :].clone()
         proprio_hist_buf[:, 0:-1, :] = src_hist
-        proprio_hist_buf[:, -1, :16] = cur_obs
-        proprio_hist_buf[:, -1, 16:32] = cur_target
+        proprio_hist_buf[:, -1, :16] = cur_obs_sim
+        proprio_hist_buf[:, -1, 16:32] = cur_target_sim
 
     # ---------- timer callback ----------
     @torch.inference_mode()
@@ -250,8 +270,10 @@ class HardwarePlayerTwoHands:
         }
         action_right = torch.clamp(self.model_right.act_inference(input_dict_right), -1.0, 1.0)
 
-        # 3) Update target
-        self.cur_target_right = self._pre_physics_step_single(action_right, self.prev_target_right)
+        # 3) Update target (model outputs sim order; the rest of this class works in
+        #    hora order, same as `allegro_dof_lower/upper` and `init_pose` below)
+        action_right_hora = _hora_sim_swap(action_right)
+        self.cur_target_right = self._pre_physics_step_single(action_right_hora, self.prev_target_right)
         self.prev_target_right = self.cur_target_right
 
         # Process left hand (independent model)
@@ -265,8 +287,10 @@ class HardwarePlayerTwoHands:
         }
         action_left = torch.clamp(self.model_left.act_inference(input_dict_left), -1.0, 1.0)
 
-        # 3) Update target
-        self.cur_target_left = self._pre_physics_step_single(action_left, self.prev_target_left)
+        # 3) Update target (model outputs sim order; the rest of this class works in
+        #    hora order, same as `allegro_dof_lower/upper` and `init_pose` below)
+        action_left_hora = _hora_sim_swap(action_left)
+        self.cur_target_left = self._pre_physics_step_single(action_left_hora, self.prev_target_left)
         self.prev_target_left = self.cur_target_left
 
         # 4) Publish commands to both hands
@@ -371,23 +395,28 @@ class HardwarePlayerTwoHands:
         obs_q_left = torch.from_numpy(hora_q_left.astype(np.float32)).to(self.device)
         self._last_obs_q_left = obs_q_left
 
-        # Initialize buffers for right hand
+        # Initialize buffers for right hand (in sim order — these feed the model,
+        # same as _post_physics_step_single)
         cur_obs_buf_right = self._unscale(obs_q_right, self.allegro_dof_lower, self.allegro_dof_upper)[None]
         self.prev_target_right = obs_q_right[None]
+        cur_obs_buf_right_sim = _hora_sim_swap(cur_obs_buf_right)
+        prev_target_right_sim = _hora_sim_swap(self.prev_target_right)
         for i in range(3):
-            self.obs_buf_right[:, i*32:i*32+16] = cur_obs_buf_right
-            self.obs_buf_right[:, i*32+16:i*32+32] = self.prev_target_right
-        self.proprio_hist_buf_right[:, :, :16] = cur_obs_buf_right
-        self.proprio_hist_buf_right[:, :, 16:32] = self.prev_target_right
+            self.obs_buf_right[:, i*32:i*32+16] = cur_obs_buf_right_sim
+            self.obs_buf_right[:, i*32+16:i*32+32] = prev_target_right_sim
+        self.proprio_hist_buf_right[:, :, :16] = cur_obs_buf_right_sim
+        self.proprio_hist_buf_right[:, :, 16:32] = prev_target_right_sim
 
-        # Initialize buffers for left hand
+        # Initialize buffers for left hand (in sim order)
         cur_obs_buf_left = self._unscale(obs_q_left, self.allegro_dof_lower, self.allegro_dof_upper)[None]
         self.prev_target_left = obs_q_left[None]
+        cur_obs_buf_left_sim = _hora_sim_swap(cur_obs_buf_left)
+        prev_target_left_sim = _hora_sim_swap(self.prev_target_left)
         for i in range(3):
-            self.obs_buf_left[:, i*32:i*32+16] = cur_obs_buf_left
-            self.obs_buf_left[:, i*32+16:i*32+32] = self.prev_target_left
-        self.proprio_hist_buf_left[:, :, :16] = cur_obs_buf_left
-        self.proprio_hist_buf_left[:, :, 16:32] = self.prev_target_left
+            self.obs_buf_left[:, i*32:i*32+16] = cur_obs_buf_left_sim
+            self.obs_buf_left[:, i*32+16:i*32+32] = prev_target_left_sim
+        self.proprio_hist_buf_left[:, :, :16] = cur_obs_buf_left_sim
+        self.proprio_hist_buf_left[:, :, 16:32] = prev_target_left_sim
 
         # Register timer (we can use either hand's node for timer)
         period = 1.0 / self.hz

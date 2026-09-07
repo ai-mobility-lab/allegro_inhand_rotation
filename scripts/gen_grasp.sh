@@ -30,7 +30,6 @@ for SCALE in "${SCALES[@]}"; do
     task.env.numEnvs=10000 test=True \
     task.env.controller.controlFrequencyInv=8 task.env.episodeLength=50 \
     task.env.controller.torque_control=False task.env.genGrasps=True task.env.baseObjScale="${SCALE}" \
-    task.env.object.type=simple_tennis_ball task.env.object.sampleProb=[1.0] \
     task.env.randomization.randomizeMass=True task.env.randomization.randomizeMassLower=0.05 task.env.randomization.randomizeMassUpper=0.051 \
     task.env.randomization.randomizeCOM=False \
     task.env.randomization.randomizeFriction=False \
