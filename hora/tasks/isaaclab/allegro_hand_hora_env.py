@@ -368,12 +368,30 @@ class AllegroHandHoraEnv(DirectRLEnv):
         self.init_pose_buf = torch.zeros((self.num_envs, self.num_dofs), device=self.device, dtype=torch.float)
 
         if self.randomize_scale and self.scale_list_init:
+            # keyed by (object_type_name, scale) -- grasp poses are shape-specific (a
+            # cube's stable grasp DOFs don't generalize to a ball), so each object type
+            # in `self.object_type_list` needs its own cache file per scale bucket. Each
+            # file is produced by a separate `AllegroHandGraspEnv` generation run (see
+            # `AllegroHandGraspEnv._reset_idx`), one per scale (generation itself keeps
+            # `randomizeScale=False`/fixed `baseObjScale`, mixing object types within
+            # that one run and splitting them into per-type files as they complete).
             self.saved_grasping_states = {}
             for s in self.randomize_scale_list:
-                cache_path = os.path.join(
-                    REPO_ROOT, "cache", f"{self.grasp_cache_name}_grasp_50k_s{str(s).replace('.', '')}.npy"
-                )
-                self.saved_grasping_states[str(s)] = torch.from_numpy(np.load(cache_path)).float().to(self.device)
+                for type_name in self.object_type_list:
+                    cache_path = os.path.join(
+                        REPO_ROOT,
+                        "cache",
+                        f"{self.grasp_cache_name}_grasp_50k_{type_name}_s{str(s).replace('.', '')}.npy",
+                    )
+                    if not os.path.isfile(cache_path):
+                        raise FileNotFoundError(
+                            f"no grasp cache for object type {type_name!r} at scale {s}: expected "
+                            f"{cache_path} to exist -- regenerate grasp caches with AllegroHandGraspEnv "
+                            "(genGrasps=True) for this object.type/baseObjScale combination"
+                        )
+                    self.saved_grasping_states[(type_name, str(s))] = (
+                        torch.from_numpy(np.load(cache_path)).float().to(self.device)
+                    )
         else:
             assert self.save_init_pose
 
@@ -460,6 +478,7 @@ class AllegroHandHoraEnv(DirectRLEnv):
         num_envs = self.cfg.scene.num_envs
         num_scales = len(self.randomize_scale_list) if self.randomize_scale else 1
         per_env_scale = np.zeros(num_envs, dtype=np.float32)
+        per_env_type_id = np.zeros(num_envs, dtype=np.int64)
         per_env_asset_cfgs = []
         self._mesh_usd_cache = {}
         object_rigid_props = hora_sim_cfg.build_rigid_body_props(self.cfg.hora_sim_dict, disable_gravity=False)
@@ -494,6 +513,7 @@ class AllegroHandHoraEnv(DirectRLEnv):
             # -- `MultiAssetSpawnerCfg` only supports a flat, order-preserving list, so
             # each env's chosen shape is resolved into its own spawn cfg up front).
             type_id = int(np.random.choice(len(self.object_type_list), p=self.object_type_prob))
+            per_env_type_id[i] = type_id
             spec = self.object_shape_specs[self.object_type_list[type_id]]
             shape_kwargs = dict(rigid_props=object_rigid_props, collision_props=object_collision_props, mass_props=object_mass_props)
             if spec["kind"] == "cuboid":
@@ -520,6 +540,11 @@ class AllegroHandHoraEnv(DirectRLEnv):
                 )
             per_env_asset_cfgs.append(shape_cfg)
         self._object_scales = torch.from_numpy(per_env_scale).to(self.device)
+        # static for the lifetime of the env -- the multi-asset spawner fixes each env's
+        # object shape at construction, never resampled per reset. Used to key the
+        # per-object-type grasp cache lookups/writes in `_reset_idx` (this class) and
+        # `AllegroHandGraspEnv._reset_idx`.
+        self.env_object_type_ids = torch.from_numpy(per_env_type_id).long().to(self.device)
 
         _, _, obj_pos = self._init_object_pose()
         return RigidObjectCfg(
@@ -691,17 +716,24 @@ class AllegroHandHoraEnv(DirectRLEnv):
         num_scales = len(self.randomize_scale_list)
         dof_pos = self.hand.data.joint_pos[env_ids].clone()
         object_pose = torch.cat([self.object.data.root_pos_w[env_ids] - self.scene.env_origins[env_ids], self.object.data.root_quat_w[env_ids]], dim=-1)
+        env_type_ids = self.env_object_type_ids[env_ids]
         for n_s in range(num_scales):
             scale_key = str(self.randomize_scale_list[n_s])
-            bucket_mask = (env_ids % num_scales) == n_s
-            if not bucket_mask.any():
+            scale_bucket_mask = (env_ids % num_scales) == n_s
+            if not scale_bucket_mask.any():
                 continue
-            n_ids = int(bucket_mask.sum().item())
-            sampled_idx = np.random.randint(self.saved_grasping_states[scale_key].shape[0], size=n_ids)
-            sampled_pose = self.saved_grasping_states[scale_key][sampled_idx].clone()
-            dof_pos[bucket_mask] = sampled_pose[:, :16]
-            object_pose[bucket_mask] = sampled_pose[:, 16:]
-            self.init_pose_buf[env_ids[bucket_mask]] = sampled_pose[:, :16].clone()
+            # further split by each env's (fixed) object type -- see
+            # `self.env_object_type_ids` -- so a reset never assigns a grasp pose that
+            # was recorded for a different object shape.
+            for type_id in env_type_ids[scale_bucket_mask].unique().tolist():
+                type_mask = scale_bucket_mask & (env_type_ids == type_id)
+                n_ids = int(type_mask.sum().item())
+                cache = self.saved_grasping_states[(self.object_type_list[type_id], scale_key)]
+                sampled_idx = np.random.randint(cache.shape[0], size=n_ids)
+                sampled_pose = cache[sampled_idx].clone()
+                dof_pos[type_mask] = sampled_pose[:, :16]
+                object_pose[type_mask] = sampled_pose[:, 16:]
+                self.init_pose_buf[env_ids[type_mask]] = sampled_pose[:, :16].clone()
 
         dof_vel = torch.zeros_like(dof_pos)
         world_pos = object_pose[:, :3] + self.scene.env_origins[env_ids]

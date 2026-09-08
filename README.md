@@ -2,6 +2,8 @@
 
 [한국어](README.md) | [English](README.es.md)
 
+:rocket: [3d mesh 기반 custom model import 기능 추가](#추가-asset-다운로드) (2026-09-07) 
+
 Allegro Hand 플랫폼을 위한 손 안 물체 회전(In-Hand Object Rotation) 참조 구현
 
 이 저장소는 **Allegro Hand 플랫폼**을 이용한 손 안 물체 회전(in-hand object rotation) 구현 예제를 제공합니다.
@@ -70,6 +72,16 @@ pip install -r hora_isaaclab_requirements.txt
 - 그랩(grasp) 포즈 생성 (`gen_grasp.py`)
 - 손 URDF 시각화/비교 (`allegro_right_left.py`, `compare_hands.py`)
 - 합성 촉각 데이터셋 수집 (`scripts/collect_feelsight_dataset.sh`)
+
+#### 추가 asset 다운로드
+
+[google drive](https://drive.google.com/file/d/1zjM2Q4hCDv_HEjXfI0LK_gqh7mofJ775/view?usp=sharing)에서 dextouch 및 ycb 데이터 다운로드.
+이후, assets 폴더 아래에 아래와 같이 배치
+```
+assets/
+├── dextouch/
+├── ycb/
+```
 
 #### 환경 2: `allegro` (실제 배포용)
 
