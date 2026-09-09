@@ -12,6 +12,7 @@
 
 import os
 import xml.etree.ElementTree as ET
+from collections.abc import Callable
 from glob import glob
 
 import numpy as np
@@ -23,7 +24,11 @@ from isaaclab.assets import Articulation, ArticulationCfg, RigidObject, RigidObj
 from isaaclab.envs import DirectRLEnv, DirectRLEnvCfg, mdp
 from isaaclab.managers import EventTermCfg as EventTerm, SceneEntityCfg
 from isaaclab.scene import InteractiveSceneCfg
+from isaaclab.sim.converters import UrdfConverter
+from isaaclab.sim.spawners.from_files.from_files import _spawn_from_usd_file
+from isaaclab.sim.spawners.materials import RigidBodyMaterialCfg
 from isaaclab.sim.spawners.wrappers import MultiAssetSpawnerCfg
+from isaaclab.sim.utils import bind_physics_material, clone, make_uninstanceable
 from isaaclab.utils import configclass
 from isaaclab.utils.math import quat_conjugate, quat_mul, sample_uniform, saturate, scale_transform
 
@@ -54,6 +59,102 @@ def _stable_usd_cache_dir(source_path: str) -> str:
     """
     stem = os.path.splitext(os.path.basename(source_path))[0]
     return os.path.join(os.path.dirname(source_path), "usd_cache", stem)
+
+
+# Placeholder tuning values -- matches the numbers `inhand_rotation`'s own `ALLEGRO_HAND_DIGIT_CFG`
+# uses for the same elastomer bodies (see that repo's `assets/allegro_hand_digit_cfg.py`, itself
+# borrowed from isaaclab_contrib's TacSL quick-start example): "tune once real DIGIT gel material
+# properties are available."
+_ELASTOMER_COMPLIANT_CONTACT_STIFFNESS = 100.0
+_ELASTOMER_COMPLIANT_CONTACT_DAMPING = 10.0
+
+
+@clone
+def _spawn_urdf_with_compliant_contact_material(
+    prim_path: str,
+    cfg: "UrdfFileWithCompliantContactCfg",
+    translation: tuple[float, float, float] | None = None,
+    orientation: tuple[float, float, float, float] | None = None,
+    **kwargs,
+):
+    """`isaaclab.sim.spawners.from_files.spawn_from_urdf`, plus binding a compliant-contact
+    physics material onto specific prims of the converted asset.
+
+    A URDF-flavored port of `isaaclab.sim.spawners.from_files.from_files.
+    spawn_from_usd_with_compliant_contact_material` (no URDF equivalent exists upstream -- only
+    `UsdFileWithCompliantContactCfg`, for an asset that is already a USD file), plus one extra
+    step `inhand_rotation`'s own `allegro_hand_digit_cfg.py` had to add on top of that same
+    upstream helper: Isaac Sim's URDF importer always authors each body's collision geometry as an
+    instanceable reference (independent of `UrdfConverterCfg.make_instanceable`), and
+    `bind_physics_material`'s traversal refuses to descend into an instanced prim -- without the
+    `make_uninstanceable` call below, the bind silently no-ops ("Could not perform
+    'bind_physics_material' on any prims under: ...") instead of reaching the actual collider mesh.
+
+    See `UrdfFileWithCompliantContactCfg`'s own docstring for why a URDF-imported DIGIT elastomer
+    specifically needs this.
+    """
+    urdf_loader = UrdfConverter(cfg)
+    prim = _spawn_from_usd_file(prim_path, urdf_loader.usd_path, cfg, translation, orientation)
+
+    stiff = cfg.compliant_contact_stiffness
+    damp = cfg.compliant_contact_damping
+    if cfg.physics_material_prim_path is None or (stiff is None and damp is None):
+        return prim
+
+    prim_paths = (
+        [cfg.physics_material_prim_path]
+        if isinstance(cfg.physics_material_prim_path, str)
+        else cfg.physics_material_prim_path
+    )
+    
+    material_kwargs = {}
+    if stiff is not None:
+        material_kwargs["compliant_contact_stiffness"] = stiff
+    if damp is not None:
+        material_kwargs["compliant_contact_damping"] = damp
+    material_cfg = RigidBodyMaterialCfg(**material_kwargs)
+
+    for path in prim_paths:
+        rigid_body_prim_path = path if path.startswith("/") else f"{prim_path}/{path}"
+        make_uninstanceable(rigid_body_prim_path)
+        material_path = f"{rigid_body_prim_path}/compliant_material"
+        material_cfg.func(material_path, material_cfg)
+        bind_physics_material(rigid_body_prim_path, material_path)
+
+    return prim
+
+
+@configclass
+class UrdfFileWithCompliantContactCfg(sim_utils.UrdfFileCfg):
+    """`UrdfFileCfg`, plus applying a compliant-contact physics material to specific prims of the
+    converted asset -- the URDF-import equivalent of `isaaclab.sim.UsdFileWithCompliantContactCfg`.
+
+    Needed for the DIGIT elastomer pads specifically: `VisuoTactileSensor`'s tactile depth image
+    is a `distance_to_image_plane` render of the elastomer's own *rigid* collision mesh, so any
+    "gel deformation" it ever reports comes entirely from how far that mesh is allowed to
+    interpenetrate the contacting object. An ordinary rigid PhysX contact resolves interpenetration
+    almost immediately at `rest_offset`, so without this, the pad registers near-zero indentation
+    (and hence a near-flat/no-contact tactile RGB and depth image) regardless of contact force. A
+    compliant contact material turns that resolution into a spring (stiffness/damping) instead,
+    letting the rigid mesh visibly sink in under load, the way a real compliant gel pad would. This
+    is exactly what `inhand_rotation`'s own `ALLEGRO_HAND_DIGIT_CFG` binds onto its elastomer
+    bodies, and was the missing piece in this repo's own DIGIT hand asset (`build_hora_env_cfg`
+    spawned every hand -- DIGIT or not -- through plain `UrdfFileCfg`) before this class existed.
+    """
+
+    func: Callable = _spawn_urdf_with_compliant_contact_material
+
+    compliant_contact_stiffness: float | None = None
+    """Same as `isaaclab.sim.spawners.materials.RigidBodyMaterialCfg.compliant_contact_stiffness`."""
+
+    compliant_contact_damping: float | None = None
+    """Same as `isaaclab.sim.spawners.materials.RigidBodyMaterialCfg.compliant_contact_damping`."""
+
+    physics_material_prim_path: str | list[str] | None = None
+    """Prim(s) (relative to this asset's own `prim_path`, e.g. a `link_*_tip_elastomer` body) to
+    bind the compliant material onto. `None` (the default) skips binding entirely, leaving
+    `UrdfFileCfg`'s ordinary rigid contact behavior untouched -- e.g. for hand assets with no
+    elastomer body at all (the non-DIGIT tasks)."""
 
 
 def _parse_primitive_geometry(urdf_path: str) -> dict:
@@ -162,25 +263,43 @@ def build_hora_env_cfg(config: dict, sim_device: str, graphics_device_id: int, h
     dt = sim_dict["dt"]
 
     hand_asset_file = os.path.join(REPO_ROOT, env_cfg["asset"]["handAsset"])
+    hand_spawn_kwargs = dict(
+        asset_path=hand_asset_file,
+        usd_dir=_stable_usd_cache_dir(hand_asset_file),
+        fix_base=True,
+        merge_fixed_joints=False,
+        activate_contact_sensors=True,
+        # `target_type="none"` documents that it forces stiffness/damping to 0.0 at
+        # conversion time, but `gains.stiffness` still has no default and fails
+        # `cfg.validate()` if left unset -- so set it explicitly too.
+        joint_drive=sim_utils.UrdfConverterCfg.JointDriveCfg(
+            target_type="none",
+            gains=sim_utils.UrdfConverterCfg.JointDriveCfg.PDGainsCfg(stiffness=0.0, damping=0.0),
+        ),
+        articulation_props=hora_sim_cfg.build_articulation_root_props(sim_dict),
+        collision_props=hora_sim_cfg.build_collision_props(sim_dict),
+        rigid_props=hora_sim_cfg.build_rigid_body_props(sim_dict, disable_gravity=True),
+    )
+    # Only the DIGIT tasks' `fingertipLinkNames` override points at `link_*_tip_elastomer`
+    # bodies (see LeftAllegroHandDigitHora.yaml) -- other hand assets (allegro_hora.urdf,
+    # allegro_left/right.urdf) have no elastomer body to bind a compliant material onto, so
+    # they keep plain `UrdfFileCfg`'s ordinary rigid contact behavior unchanged.
+    elastomer_links = [
+        name for name in env_cfg["asset"].get("fingertipLinkNames", []) if name.endswith("_elastomer")
+    ]
+    if elastomer_links:
+        hand_spawn_cfg = UrdfFileWithCompliantContactCfg(
+            physics_material_prim_path=elastomer_links,
+            compliant_contact_stiffness=_ELASTOMER_COMPLIANT_CONTACT_STIFFNESS,
+            compliant_contact_damping=_ELASTOMER_COMPLIANT_CONTACT_DAMPING,
+            **hand_spawn_kwargs,
+        )
+    else:
+        hand_spawn_cfg = sim_utils.UrdfFileCfg(**hand_spawn_kwargs)
+
     robot_cfg = ArticulationCfg(
         prim_path="/World/envs/env_.*/Robot",
-        spawn=sim_utils.UrdfFileCfg(
-            asset_path=hand_asset_file,
-            usd_dir=_stable_usd_cache_dir(hand_asset_file),
-            fix_base=True,
-            merge_fixed_joints=False,
-            activate_contact_sensors=True,
-            # `target_type="none"` documents that it forces stiffness/damping to 0.0 at
-            # conversion time, but `gains.stiffness` still has no default and fails
-            # `cfg.validate()` if left unset -- so set it explicitly too.
-            joint_drive=sim_utils.UrdfConverterCfg.JointDriveCfg(
-                target_type="none",
-                gains=sim_utils.UrdfConverterCfg.JointDriveCfg.PDGainsCfg(stiffness=0.0, damping=0.0),
-            ),
-            articulation_props=hora_sim_cfg.build_articulation_root_props(sim_dict),
-            collision_props=hora_sim_cfg.build_collision_props(sim_dict),
-            rigid_props=hora_sim_cfg.build_rigid_body_props(sim_dict, disable_gravity=True),
-        ),
+        spawn=hand_spawn_cfg,
         init_state=ArticulationCfg.InitialStateCfg(
             # matches `_init_object_pose`'s `allegro_hand_start_pose`: pos (0, 0, 0.5),
             # rot = Quat.from_axis_angle((0,1,0), -pi/2) * Quat.from_axis_angle((1,0,0), pi/2)
@@ -370,18 +489,20 @@ class AllegroHandHoraEnv(DirectRLEnv):
         if self.randomize_scale and self.scale_list_init:
             # keyed by (object_type_name, scale) -- grasp poses are shape-specific (a
             # cube's stable grasp DOFs don't generalize to a ball), so each object type
-            # in `self.object_type_list` needs its own cache file per scale bucket. Each
-            # file is produced by a separate `AllegroHandGraspEnv` generation run (see
-            # `AllegroHandGraspEnv._reset_idx`), one per scale (generation itself keeps
-            # `randomizeScale=False`/fixed `baseObjScale`, mixing object types within
-            # that one run and splitting them into per-type files as they complete).
+            # in `self.object_type_list` gets its own `cache/<type_name>/` subfolder
+            # holding one file per scale bucket. Each file is produced by a separate
+            # `AllegroHandGraspEnv` generation run (see `AllegroHandGraspEnv._reset_idx`),
+            # one per scale (generation itself keeps `randomizeScale=False`/fixed
+            # `baseObjScale`, mixing object types within that one run and splitting them
+            # into their own per-type subfolders as they complete).
             self.saved_grasping_states = {}
             for s in self.randomize_scale_list:
                 for type_name in self.object_type_list:
                     cache_path = os.path.join(
                         REPO_ROOT,
                         "cache",
-                        f"{self.grasp_cache_name}_grasp_50k_{type_name}_s{str(s).replace('.', '')}.npy",
+                        type_name,
+                        f"{self.grasp_cache_name}_grasp_50k_s{str(s).replace('.', '')}.npy",
                     )
                     if not os.path.isfile(cache_path):
                         raise FileNotFoundError(

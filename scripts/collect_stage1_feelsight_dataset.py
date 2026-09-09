@@ -1,24 +1,32 @@
 # --------------------------------------------------------
-# Rolls out a trained HORA stage-2 (ProprioAdapt) policy on the `LeftAllegroHandDigitHora`
-# task and records a NeuralFeels-"feelsight"-style visuotactile dataset: per-finger DIGIT
-# tactile image/depth/mask, an external RGB-D + object-mask camera, and robot/object pose
-# tracks -- see `scripts/dataset_collection/feelsight_writer.py` for the exact on-disk
-# layout and `scripts/dataset_collection/sensors.py` for how the DIGIT tactile sensors
-# (VisuoTactileSensor, attached to `assets/allegro/allegro_digit_left_elastomer.urdf`'s
+# Rolls out a trained HORA stage-1 (PPO, ground-truth privileged-info) policy on the
+# `LeftAllegroHandDigitHora` task and records a NeuralFeels-"feelsight"-style visuotactile
+# dataset: per-finger DIGIT tactile image/depth/mask, an external RGB-D + object-mask camera,
+# and robot/object pose tracks -- see `scripts/dataset_collection/feelsight_writer.py` for the
+# exact on-disk layout and `scripts/dataset_collection/sensors.py` for how the DIGIT tactile
+# sensors (VisuoTactileSensor, attached to `assets/allegro/allegro_digit_left_elastomer.urdf`'s
 # `link_*_tip_elastomer` bodies -- see `scripts/tools/tacsl_sensor_demo.py` and
 # `inhand_rotation_env_cfg.py` in the sibling `inhand_rotation` repo, which this mirrors)
 # and the scene camera are bolted onto `AllegroHandHoraEnv`, which has neither by default.
 #
-# Mirrors `vis_s2.sh`'s stage-2 test invocation (`train.algo=ProprioAdapt
-# train.ppo.priv_info=True train.ppo.proprio_adapt=True test=True`) but drives the env/
-# policy directly instead of going through `train.py`'s hydra `main()`, so a custom
-# per-step data-collection loop (and the extra camera/tactile sensors) can be added.
+# This is the stage-1 counterpart of `collect_stage2_feelsight_dataset.py`: it loads a plain
+# PPO checkpoint (`stage1_nn/best.pth`) instead of a ProprioAdapt one, and at inference feeds
+# the policy the environment's ground-truth privileged info directly (`obs_dict["priv_info"]`)
+# rather than routing through the proprioceptive-history adaptation module -- mirroring
+# `ActorCritic._actor_critic`'s "Stage 1" branch (`hora/algo/models/models.py`) and
+# `PPO.test()` (`hora/algo/ppo/ppo.py`). There is no `sa_mean_std`/`proprio_hist` normalizer
+# involved, since stage-1 checkpoints don't have one.
+#
+# Mirrors `vis_s1.sh`'s stage-1 test invocation (`train.algo=PPO train.ppo.priv_info=True
+# test=True`) but drives the env/policy directly instead of going through `train.py`'s hydra
+# `main()`, so a custom per-step data-collection loop (and the extra camera/tactile sensors)
+# can be added.
 #
 # Usage (run from the `allegro_inhand_rotation` repo root, matching `train.py`'s own
 # convention -- IsaacLab's tiled cameras need `--enable_cameras` even when `--headless`):
 #
-#   ./isaaclab.sh -p scripts/collect_stage2_feelsight_dataset.py --enable_cameras --headless \
-#       --checkpoint outputs/LeftAllegroHandDigitHora/baseline/stage2_nn/best.pth \
+#   ./isaaclab.sh -p scripts/collect_stage1_feelsight_dataset.py --enable_cameras --headless \
+#       --checkpoint outputs/LeftAllegroHandDigitHora/baseline/stage1_nn/best.pth \
 #       --num_episodes 5 --episode_steps 300 --output_dir data/feelsight_sim
 #
 # Extra Hydra-style overrides (e.g. to change the manipulated object) can be appended
@@ -52,8 +60,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--task", default="LeftAllegroHandDigitHora")
     parser.add_argument(
         "--checkpoint",
-        default=str(REPO_ROOT / "outputs/LeftAllegroHandDigitHora/baseline/stage2_nn/best.pth"),
-        help="stage-2 (ProprioAdapt) checkpoint, e.g. outputs/<task>/<run>/stage2_nn/best.pth",
+        default=str(REPO_ROOT / "outputs/LeftAllegroHandDigitHora/baseline/stage1_nn/best.pth"),
+        help="stage-1 (PPO) checkpoint, e.g. outputs/<task>/<run>/stage1_nn/best.pth",
     )
     parser.add_argument("--num_episodes", type=int, default=5)
     parser.add_argument("--episode_steps", type=int, default=300, help="control steps per episode (HORA default episodeLength=400)")
@@ -71,6 +79,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--tactile_mask_eps", type=float, default=3e-4, help="gel deformation (m) above which a tactile pixel counts as 'contact' in the mask frame")
     parser.add_argument("--gt_sdf_voxel_size", type=float, default=5e-4, help="voxel pitch (m) for the ground-truth object gt_sdf_voxel=<...>.npz, matches neuralfeels' default gt_voxel_size")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--debug_baseline_dir", default=str(REPO_ROOT / "outputs/collect_stage1_baseline_debug"),
+        help="dump hand pose + per-finger tactile RGB/depth to this dir right when "
+        "capture_initial_tactile_render() runs, so the no-contact baseline can be inspected "
+        "visually; pass an empty string to skip",
+    )
     return parser
 
 
@@ -132,9 +146,9 @@ def main():
 
     checkpoint_path = Path(args_cli.checkpoint).resolve()
     if not checkpoint_path.is_file():
-        raise SystemExit(f"stage2 checkpoint not found: {checkpoint_path}")
+        raise SystemExit(f"stage1 checkpoint not found: {checkpoint_path}")
 
-    # ---- compose the same Hydra config train.py would build for `vis_s2.sh`'s stage-2
+    # ---- compose the same Hydra config train.py would build for `vis_s1.sh`'s stage-1
     # test invocation, but through the compose API (no need for a hydra-clean argv here).
     with hydra.initialize_config_dir(config_dir=str(REPO_ROOT / "configs"), version_base=None):
         overrides = [
@@ -142,9 +156,8 @@ def main():
             f"headless={args_cli.headless}",
             f"sim_device={args_cli.device}",
             "test=True",
-            "train.algo=ProprioAdapt",
+            "train.algo=PPO",
             "train.ppo.priv_info=True",
-            "train.ppo.proprio_adapt=True",
             "wandb.enabled=False",
             "task.env.numEnvs=1",
             f"task.env.object.type={args_cli.object_name}",
@@ -180,8 +193,10 @@ def main():
     )
     env = HoraDirectEnvWrapper(raw_env, task_cfg_dict)
 
-    # ---- build + load the stage-2 (ProprioAdapt) policy -- exact same construction as
-    # `hora/algo/padapt/padapt.py`'s `ProprioAdapt.__init__`/`restore_test`.
+    # ---- build + load the stage-1 (PPO) policy -- exact same construction as
+    # `hora/algo/ppo/ppo.py`'s `PPO.__init__`/`restore_test`. Unlike stage-2, there is no
+    # `sa_mean_std` (proprio-history normalizer) to load, and inference feeds the policy
+    # `priv_info` straight from the env instead of an adapted proprio history.
     device = cfg.rl_device
     net_config = {
         "actor_units": cfg.train.network.mlp.units,
@@ -194,15 +209,12 @@ def main():
     }
     model = ActorCritic(net_config).to(device)
     running_mean_std = RunningMeanStd(env.observation_space.shape).to(device)
-    sa_mean_std = RunningMeanStd((env.prop_hist_len, 32)).to(device)
 
     checkpoint = torch.load(str(checkpoint_path), map_location=device)
     running_mean_std.load_state_dict(checkpoint["running_mean_std"])
     model.load_state_dict(checkpoint["model"])
-    sa_mean_std.load_state_dict(checkpoint["sa_mean_std"])
     model.eval()
     running_mean_std.eval()
-    sa_mean_std.eval()
 
     object_name = args_cli.object_name or str(task_cfg_dict["env"]["object"]["type"])
     object_spawn_cfg = getattr(raw_env.object.cfg, "spawn", None)
@@ -237,6 +249,40 @@ def main():
     # every reset. See `capture_initial_tactile_render`'s docstring.
     raw_env.capture_initial_tactile_render()
 
+    if args_cli.debug_baseline_dir:
+        debug_dir = Path(args_cli.debug_baseline_dir)
+        debug_dir.mkdir(parents=True, exist_ok=True)
+
+        base_pos = raw_env.hand.data.root_pos_w[0].detach().cpu().numpy()
+        base_quat = raw_env.hand.data.root_quat_w[0].detach().cpu().numpy()
+        joint_pos = raw_env.hand.data.joint_pos[0].detach().cpu().numpy()
+        print(f"[debug] baseline hand base pos={base_pos} quat={base_quat}")
+        print(f"[debug] baseline hand joint_pos={np.array2string(joint_pos, precision=4, suppress_small=True)}")
+
+        for finger in FINGER_NAMES:
+            fingertip_pos = raw_env.hand.data.body_pos_w[0, body_ids[finger]].detach().cpu().numpy()
+            nominal_depth = raw_env.nominal_tactile_depth[finger][0, ..., 0].detach().cpu().numpy()
+            print(
+                f"[debug] baseline {finger}: fingertip world pos={fingertip_pos}, "
+                f"nominal depth min/max={nominal_depth.min():.6f}/{nominal_depth.max():.6f} m"
+            )
+
+            rgb = np.clip(raw_env.tactile_sensors[finger].data.tactile_rgb_image[0].detach().cpu().numpy(), 0, 255).astype(np.uint8)
+            Image.fromarray(rgb, mode="RGB").save(debug_dir / f"baseline_{finger}_rgb.png")
+
+            depth_range = max(nominal_depth.max() - nominal_depth.min(), 1e-9)
+            depth_u8 = np.clip((nominal_depth - nominal_depth.min()) / depth_range * 255, 0, 255).astype(np.uint8)
+            Image.fromarray(depth_u8, mode="L").save(debug_dir / f"baseline_{finger}_depth.png")
+
+        # -- a wide shot of the whole hand from the external scene camera, so the hand's
+        # actual pose at capture time (not just each fingertip's close-up tactile view) can
+        # be seen -- same camera/format the main per-step loop below saves.
+        if raw_env.scene_cam is not None:
+            scene_rgb = raw_env.scene_cam.data.output["rgb"][0].detach().cpu().numpy().astype(np.uint8)
+            Image.fromarray(scene_rgb, mode="RGB").save(debug_dir / "baseline_scene_rgb.png")
+
+        print(f"[debug] saved baseline hand pose + per-finger RGB/depth to {debug_dir}")
+
     for ep in range(args_cli.num_episodes):
         writer = EpisodeWriter(output_root, ep, camera_name=args_cli.camera_name)
         obs_dict = env.reset()
@@ -249,7 +295,7 @@ def main():
             with torch.no_grad():
                 input_dict = {
                     "obs": running_mean_std(obs_dict["obs"]),
-                    "proprio_hist": sa_mean_std(obs_dict["proprio_hist"].detach()),
+                    "priv_info": obs_dict["priv_info"],
                 }
                 mu = model.act_inference(input_dict)
                 mu = torch.clamp(mu, -1.0, 1.0)

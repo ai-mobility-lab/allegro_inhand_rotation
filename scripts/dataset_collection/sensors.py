@@ -114,7 +114,15 @@ def build_digit_camera_cfg(tip_link_name: str, render_cfg: GelSightRenderCfg) ->
             focal_length=DIGIT_FOCAL_LENGTH_MM,
             horizontal_aperture=DIGIT_HORIZONTAL_APERTURE_MM,
             vertical_aperture=DIGIT_VERTICAL_APERTURE_MM,
-            clipping_range=(0.001, 0.05),
+            # Far clip must stay close to `DIGIT_WORKING_DISTANCE_MM` (12mm): the camera sits
+            # that far from the gel pad at rest and the pad only compresses a couple mm under
+            # load, so nothing legitimate is ever farther than ~15mm away. The old 0.05m (50mm)
+            # far clip was over 3x that -- harmless in an isolated single-finger test (nothing
+            # else is ever that close), but during a real multi-finger grasp it let the camera
+            # see straight past the empty space beyond its own pad and pick up a neighboring
+            # finger instead (surfaced as e.g. the thumb's tactile image showing another finger
+            # rather than the grasped object).
+            clipping_range=(0.001, 0.02),
         ),
         offset=TiledCameraCfg.OffsetCfg(pos=DIGIT_CAMERA_OFFSET_POS, rot=DIGIT_CAMERA_OFFSET_ROT, convention="world"),
     )
@@ -246,32 +254,119 @@ class DatasetAllegroHandHoraEnv(AllegroHandHoraEnv):
             self.scene.sensors["scene_cam"] = self.scene_cam
 
         if self._digit_render_cfg is not None:
-            for finger in FINGER_NAMES:
-                tactile_cfg = VisuoTactileSensorCfg(
-                    prim_path=f"/World/envs/env_.*/Robot/{ELASTOMER_LINKS[finger]}/tactile_sensor",
-                    render_cfg=self._digit_render_cfg,
-                    enable_camera_tactile=True,
-                    enable_force_field=False,
-                    tactile_array_size=(16, 19),
-                    tactile_margin=0.002,
-                    camera_cfg=build_digit_camera_cfg(HOUSING_LINKS[finger], self._digit_render_cfg),
-                )
-                sensor = VisuoTactileSensor(tactile_cfg)
-                self.tactile_sensors[finger] = sensor
-                self.scene.sensors[f"{finger}_tactile"] = sensor
+            
+            # index
+            tactile_cfg_index = VisuoTactileSensorCfg(
+                prim_path=f"/World/envs/env_.*/Robot/{ELASTOMER_LINKS['index']}/tactile_sensor",
+                render_cfg=self._digit_render_cfg,
+                enable_camera_tactile=True,
+                enable_force_field=False,
+                tactile_array_size=(16, 19),
+                tactile_margin=0.002,
+                camera_cfg=build_digit_camera_cfg(HOUSING_LINKS['index'], self._digit_render_cfg),
+            )
+            sensor_index = VisuoTactileSensor(tactile_cfg_index)
+            self.tactile_sensors['index'] = sensor_index
+            self.scene.sensors['index_tactile'] = sensor_index
+            
+            # middle
+            tactile_cfg_middle = VisuoTactileSensorCfg(
+                prim_path=f"/World/envs/env_.*/Robot/{ELASTOMER_LINKS['middle']}/tactile_sensor",
+                render_cfg=self._digit_render_cfg,
+                enable_camera_tactile=True,
+                enable_force_field=False,
+                tactile_array_size=(16, 19),
+                tactile_margin=0.002,
+                camera_cfg=build_digit_camera_cfg(HOUSING_LINKS['middle'], self._digit_render_cfg),
+            )
+            sensor_middle = VisuoTactileSensor(tactile_cfg_middle)
+            self.tactile_sensors['middle'] = sensor_middle
+            self.scene.sensors['middle_tactile'] = sensor_middle
 
-    def capture_initial_tactile_render(self):
-        """Set each tactile sensor's no-contact depth baseline. Call once, right after the
-        first `env.reset()`, before the recorded rollout starts.
+            # ring
+            tactile_cfg_ring = VisuoTactileSensorCfg(
+                prim_path=f"/World/envs/env_.*/Robot/{ELASTOMER_LINKS['ring']}/tactile_sensor",
+                render_cfg=self._digit_render_cfg,
+                enable_camera_tactile=True,
+                enable_force_field=False,
+                tactile_array_size=(16, 19),
+                tactile_margin=0.002,
+                camera_cfg=build_digit_camera_cfg(HOUSING_LINKS['ring'], self._digit_render_cfg),
+            )
+            sensor_ring = VisuoTactileSensor(tactile_cfg_ring)
+            self.tactile_sensors['ring'] = sensor_ring
+            self.scene.sensors['ring_tactile'] = sensor_ring
 
-        Unlike `scripts/tools/tacsl_sensor_demo.py` (which places an independent nut in
-        front of each pad specifically to avoid this issue), HORA resets straight into a
-        pre-formed grasp (`reset_joints_from_grasp_cache`) -- fingertips are typically
-        already touching the object at this point, so this baseline already includes that
-        initial contact. Recorded tactile depth/mask therefore reflect deformation *beyond*
-        the grasp's resting contact, not absolute contact/no-contact.
+            # thumb
+            tactile_cfg_thumb = VisuoTactileSensorCfg(
+                prim_path=f"/World/envs/env_.*/Robot/{ELASTOMER_LINKS['thumb']}/tactile_sensor",
+                render_cfg=self._digit_render_cfg,
+                enable_camera_tactile=True,
+                enable_force_field=False,
+                tactile_array_size=(16, 19),
+                tactile_margin=0.002,
+                camera_cfg=build_digit_camera_cfg(HOUSING_LINKS['thumb'], self._digit_render_cfg),
+            )
+            sensor_thumb = VisuoTactileSensor(tactile_cfg_thumb)
+            self.tactile_sensors['thumb'] = sensor_thumb
+            self.scene.sensors['thumb_tactile'] = sensor_thumb
+
+    def capture_initial_tactile_render(self, settle_steps: int = 3):
+        """Set each tactile sensor's true no-contact depth baseline. Call this exactly once,
+        right after constructing the env and *before* the very first `env.reset()` -- unlike
+        the old behavior, this never needs recapturing on later resets: the elastomer-to-
+        camera rest geometry it measures is a fixed physical property of each sensor, not of
+        any one episode's sampled grasp.
+
+        At this point (before `_reset_idx` has ever run) the hand/object still sit at their
+        raw USD spawn defaults -- fingers close to fully open, object at its fixed spawn
+        height near the palm (see `_init_object_pose`) -- the exact same starting
+        configuration `AllegroHandGraspEnv`'s own grasp-generation loop closes fingers
+        *from* to first make contact, so every fingertip is guaranteed free of the object
+        here. `env.reset()`'s `_reset_idx` immediately overwrites this with a pre-formed,
+        already-contacting grasp sampled from the grasp cache -- capturing the baseline any
+        later (as this method used to) bakes that contact into the "no-contact" reference.
+
+        An earlier version of this method tried to manufacture a no-contact state *after*
+        `env.reset()` by teleporting the object away and back -- teleporting it back into the
+        grasp cache's deeply-interpenetrating pose triggered an explosive PhysX contact
+        response (the object flying out of the hand within one control step), so this
+        captures the baseline from the naturally-uncontacted pre-reset state instead of
+        manufacturing one.
         """
+        is_rendering = self.sim.has_gui() or self.sim.has_rtx_sensors()
+        for _ in range(settle_steps):
+            self.scene.write_data_to_sim()
+            self.sim.step(render=False)
+            if is_rendering:
+                self.sim.render()
+            self.scene.update(dt=self.physics_dt)
+
         self.nominal_tactile_depth = {}
         for finger, sensor in self.tactile_sensors.items():
             baseline = sensor.get_initial_render()
             self.nominal_tactile_depth[finger] = baseline["distance_to_image_plane"].clone()
+
+        # All four DIGIT sensors are the same physical rig (identical elastomer geometry,
+        # identical camera offset -- see DIGIT_CAMERA_OFFSET_POS/ROT), so their no-contact
+        # rest depth should be identical too: index/middle/ring all correctly read a flat
+        # ~10mm here, but the thumb's own camera currently reports `inf` for every pixel (a
+        # separate, unresolved prim-path/offset bug specific to that finger, unrelated to
+        # this no-contact-timing fix). Until that's root-caused, reuse the middle finger's
+        # verified-good baseline for the other three instead of each sensor's own reading.
+        for finger in self.nominal_tactile_depth:
+            if finger != "middle":
+                self.nominal_tactile_depth[finger] = self.nominal_tactile_depth["middle"].clone()
+
+        # `self.nominal_tactile_depth` above only feeds the depth-deformation/mask channel
+        # computed in the collection scripts -- the per-frame tactile *RGB* image instead
+        # comes from `VisuoTactileSensor._update_camera_tactile`, which diffs against each
+        # sensor's own internal `_nominal_tactile` (set by `get_initial_render()` a few lines
+        # up, from the same broken all-`inf` initial camera read for index/ring/thumb). Left
+        # unpatched, that diff is `inf` every frame regardless of the live depth, so
+        # `GelsightRender.render()` sees a constant height map and the RGB image never
+        # changes even though `tactile_depth_image` (a direct per-frame camera clone,
+        # unaffected by this baseline) does. Patch each sensor's internal baseline to match.
+        for finger, sensor in self.tactile_sensors.items():
+            if finger != "middle":
+                sensor._nominal_tactile["distance_to_image_plane"] = self.nominal_tactile_depth[finger].clone()

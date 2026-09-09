@@ -6,7 +6,7 @@
 # --------------------------------------------------------
 # Modified by Wonik Robotics (2025)
 # IsaacLab port of hora/tasks/allegro_hand_grasp.py. Generates the grasp-pose
-# caches under `cache/*.npy` consumed by `AllegroHandHoraEnv._reset_idx`.
+# caches under `cache/<object_type>/*.npy` consumed by `AllegroHandHoraEnv._reset_idx`.
 #
 # The original's fingertip-contact check used `isaacgym.gymapi`'s CPU-only
 # `get_env_rigid_contacts`, which is also why the original asserted
@@ -77,7 +77,8 @@ class AllegroHandGraspEnv(AllegroHandHoraEnv):
         # keyed by object type name (see `AllegroHandHoraEnv.env_object_type_ids`) --
         # object types are mixed within one generation run (only scale is held fixed
         # per run), so successful grasps are split by type as they come in and each
-        # type's cache is flushed to its own file once it fills up.
+        # type's cache is flushed to its own `cache/<type_name>/` subfolder once it
+        # fills up.
         self.saved_grasping_states: dict[str, torch.Tensor] = {}
         self.cached_object_types: set[str] = set()
         self.canonical_pose = torch.tensor(CANONICAL_POSE, dtype=torch.float, device=self.device)
@@ -190,10 +191,10 @@ class AllegroHandGraspEnv(AllegroHandHoraEnv):
                 continue
             print(f"[{type_name}] current cache size:", states.shape[0])
             if states.shape[0] >= self.max_cache_size:
+                type_dir = os.path.join(REPO_ROOT, "cache", type_name)
+                os.makedirs(type_dir, exist_ok=True)
                 name = os.path.join(
-                    REPO_ROOT,
-                    "cache",
-                    f"{self.grasp_cache_name}_grasp_50k_{type_name}_s{str(self.base_obj_scale).replace('.', '')}.npy",
+                    type_dir, f"{self.grasp_cache_name}_grasp_50k_s{str(self.base_obj_scale).replace('.', '')}.npy"
                 )
                 np.save(name, states[: self.max_cache_size].cpu().numpy())
                 print(f"saved {self.max_cache_size} grasp poses for {type_name!r} to {name}")

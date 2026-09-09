@@ -208,6 +208,7 @@ wandb/
 debug/
 assets/ycb/
 assets/dextouch/
+data/
 *.tar.gz
 # Marimo
 marimo/_static/

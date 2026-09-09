@@ -2,7 +2,7 @@ name: LeftAllegroHandDigitHora
 defaults:
   - AllegroHandHora
 env:
-  reset_height_threshold: 0.625
+  reset_height_threshold: 0.6
   grasp_cache_name: 'allegro_digit_left'
 
   reward:

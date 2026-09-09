@@ -10,9 +10,16 @@
 # arrays this writes out load-compatible with `Trainer.load_gt_sdf`, which expects exactly
 # that occupancy -> EDT -> metric-scaled construction and the voxel-to-object `tf`.
 #
-# The manipulated objects here are native IsaacLab shape prims (Cuboid/Cylinder/Sphere,
-# see `AllegroHandHoraEnv._build_object_cfg`), not a mesh file, so the ground-truth mesh is
-# built straight from that spawn cfg instead of `sdf_util.load_gt_mesh`'s URDF path.
+# The manipulated object is either a native IsaacLab shape prim (Cuboid/Cylinder/Sphere) or,
+# for YCB/DexTouch objects, a converted-to-USD mesh (see `AllegroHandHoraEnv._build_object_cfg`
+# / `_get_mesh_usd_path`, which runs IsaacLab's `MeshConverter` over `assets/{ycb,dextouch}/**`
+# source meshes). Either way the ground-truth mesh is built straight from the spawn cfg instead
+# of `sdf_util.load_gt_mesh`'s URDF path. For the mesh case, `trimesh` has no USD loader, so we
+# read the *original* source mesh path (OBJ/STL/...) back out of the `config.yaml` that
+# `MeshConverter` writes alongside its cached `.usd` (its `asset_path` key) and load that
+# instead -- the object's random per-episode scale (`UsdFileCfg.scale`) is applied at spawn
+# time as a prim-level transform rather than baked into the converted USD, so it must be
+# reapplied to the loaded mesh here too.
 # --------------------------------------------------------
 
 from __future__ import annotations
@@ -25,9 +32,10 @@ from scipy import ndimage
 
 
 def trimesh_from_shape_cfg(shape_cfg) -> trimesh.Trimesh:
-    """Ground-truth mesh for one `CuboidCfg`/`CylinderCfg`/`SphereCfg`, in the object's own
-    local (root-prim) frame -- these primitives spawn centered on their prim's origin with
-    no extra offset, matching the tracked `object.pose` (the RigidObject's root pose)."""
+    """Ground-truth mesh for one `CuboidCfg`/`CylinderCfg`/`SphereCfg`/`UsdFileCfg` (the last
+    for YCB/DexTouch mesh objects), in the object's own local (root-prim) frame -- these all
+    spawn centered on their prim's origin with no extra offset, matching the tracked
+    `object.pose` (the RigidObject's root pose)."""
     import isaaclab.sim as sim_utils
 
     if isinstance(shape_cfg, sim_utils.CuboidCfg):
@@ -44,7 +52,36 @@ def trimesh_from_shape_cfg(shape_cfg) -> trimesh.Trimesh:
         return mesh
     if isinstance(shape_cfg, sim_utils.SphereCfg):
         return trimesh.creation.icosphere(radius=shape_cfg.radius)
+    # duck-typed rather than `isinstance(shape_cfg, sim_utils.UsdFileCfg)`: Isaac Sim's
+    # extension/module reload machinery can leave `AllegroHandHoraEnv`'s `isaaclab.sim` import
+    # (used to build `shape_cfg`) and this function's own as distinct module instances, so the
+    # otherwise-identical `UsdFileCfg` class fails an `isinstance` check against itself here --
+    # `usd_path` is unique to `UsdFileCfg` among the spawn cfg types used in this codebase.
+    if hasattr(shape_cfg, "usd_path"):
+        return trimesh_from_usd_file_cfg(shape_cfg)
     raise TypeError(f"no ground-truth mesh builder for object spawn cfg type {type(shape_cfg)}")
+
+
+def trimesh_from_usd_file_cfg(shape_cfg) -> trimesh.Trimesh:
+    """Ground-truth mesh for a YCB/DexTouch object spawned from a `MeshConverter`-produced
+    USD (`AllegroHandHoraEnv._get_mesh_usd_path`). `trimesh` can't load USD directly, so this
+    reads the original source mesh path (OBJ/STL/...) back out of the `config.yaml` that
+    `MeshConverter` writes next to its cached `.usd`, and reapplies `shape_cfg.scale` (baked
+    into the spawned prim's transform, not into the converted USD -- see module docstring)."""
+    from isaaclab.utils.io import load_yaml
+
+    usd_path = Path(shape_cfg.usd_path)
+    config_yaml = usd_path.parent / "config.yaml"
+    if not config_yaml.is_file():
+        raise FileNotFoundError(
+            f"expected a MeshConverter config.yaml (with the original source mesh path) next to "
+            f"{usd_path}, found none at {config_yaml}"
+        )
+    source_mesh_path = load_yaml(str(config_yaml))["asset_path"]
+    mesh = trimesh.load(source_mesh_path, force="mesh")
+    if shape_cfg.scale is not None:
+        mesh.apply_scale(shape_cfg.scale)
+    return mesh
 
 
 def voxelize_subdivide(mesh, pitch, origin_voxel=np.zeros(3), max_iter=10, edge_factor=2.0):
