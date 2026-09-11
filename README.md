@@ -2,7 +2,7 @@
 
 [한국어](README.md) | [English](README.es.md)
 
-:rocket: _apply_action 함수 내 오류 수정 및 촉각 센서 오류 수정(2026-09-11) 
+:rocket: _apply_action 함수 내 오류 수정 및 촉각 센서 오류 수정(2026-09-11)  
 :rocket: [3d mesh 기반 custom model import 기능 추가](#추가-asset-다운로드) (2026-09-07) 
 
 Allegro Hand 플랫폼을 위한 손 안 물체 회전(In-Hand Object Rotation) 참조 구현

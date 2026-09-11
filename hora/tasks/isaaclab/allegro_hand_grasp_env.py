@@ -6,7 +6,7 @@
 # --------------------------------------------------------
 # Modified by Wonik Robotics (2025)
 # IsaacLab port of hora/tasks/allegro_hand_grasp.py. Generates the grasp-pose
-# caches under `cache/<object_type>/*.npy` consumed by `AllegroHandHoraEnv._reset_idx`.
+# caches under `cache/*.npy` consumed by `AllegroHandHoraEnv._reset_idx`.
 #
 # The original's fingertip-contact check used `isaacgym.gymapi`'s CPU-only
 # `get_env_rigid_contacts`, which is also why the original asserted
@@ -74,13 +74,7 @@ class AllegroHandGraspEnv(AllegroHandHoraEnv):
     def __init__(self, cfg, render_mode: str | None = None, **kwargs):
         self.fingertip_link_names = cfg.hora_cfg["asset"].get("fingertipLinkNames", FINGERTIP_LINK_NAMES)
         super().__init__(cfg, render_mode, **kwargs)
-        # keyed by object type name (see `AllegroHandHoraEnv.env_object_type_ids`) --
-        # object types are mixed within one generation run (only scale is held fixed
-        # per run), so successful grasps are split by type as they come in and each
-        # type's cache is flushed to its own `cache/<type_name>/` subfolder once it
-        # fills up.
-        self.saved_grasping_states: dict[str, torch.Tensor] = {}
-        self.cached_object_types: set[str] = set()
+        self.saved_grasping_states = torch.zeros((0, 23), dtype=torch.float, device=self.device)
         self.canonical_pose = torch.tensor(CANONICAL_POSE, dtype=torch.float, device=self.device)
         self.max_cache_size = 50000
         self.fingertip_body_ids = [self.hand.body_names.index(n) for n in self.fingertip_link_names]
@@ -166,45 +160,18 @@ class AllegroHandGraspEnv(AllegroHandHoraEnv):
         self.rb_forces[env_ids] = 0.0
 
         # cache the (dof_pos, object_pose) pairs of envs whose grasp survived the full
-        # episode, exactly as `AllegroHandGrasp.reset_idx` does -- split per object type
-        # since a grasp pose only makes sense for the shape it was recorded on.
+        # episode, exactly as `AllegroHandGrasp.reset_idx` does.
         all_states = torch.cat(
             [self.hand.data.joint_pos, torch.cat([self.object_pos, self.object.data.root_quat_w], dim=-1)], dim=1
         )
-        success_env_ids = env_ids[success_mask]
-        if len(success_env_ids) > 0:
-            success_states = all_states[success_env_ids]
-            success_type_ids = self.env_object_type_ids[success_env_ids]
-            for type_id in success_type_ids.unique().tolist():
-                type_name = self.object_type_list[type_id]
-                if type_name in self.cached_object_types:
-                    continue  # already flushed to disk -- stop accumulating for it
-                existing = self.saved_grasping_states.get(
-                    type_name, torch.zeros((0, 23), dtype=torch.float, device=self.device)
-                )
-                self.saved_grasping_states[type_name] = torch.cat(
-                    [existing, success_states[success_type_ids == type_id]]
-                )
-
-        for type_name, states in self.saved_grasping_states.items():
-            if type_name in self.cached_object_types:
-                continue
-            print(f"[{type_name}] current cache size:", states.shape[0])
-            if states.shape[0] >= self.max_cache_size:
-                type_dir = os.path.join(REPO_ROOT, "cache", type_name)
-                os.makedirs(type_dir, exist_ok=True)
-                name = os.path.join(
-                    type_dir, f"{self.grasp_cache_name}_grasp_50k_s{str(self.base_obj_scale).replace('.', '')}.npy"
-                )
-                np.save(name, states[: self.max_cache_size].cpu().numpy())
-                print(f"saved {self.max_cache_size} grasp poses for {type_name!r} to {name}")
-                self.cached_object_types.add(type_name)
-
-        # object types are assigned once at construction (`env_object_type_ids`) --
-        # only exit once every type actually present among the envs has been flushed.
-        present_types = {self.object_type_list[t] for t in self.env_object_type_ids.unique().tolist()}
-        if present_types and present_types.issubset(self.cached_object_types):
-            raise SystemExit(f"saved grasp poses for all object types: {sorted(self.cached_object_types)}")
+        self.saved_grasping_states = torch.cat([self.saved_grasping_states, all_states[env_ids][success_mask]])
+        print("current cache size:", self.saved_grasping_states.shape[0])
+        if self.saved_grasping_states.shape[0] >= self.max_cache_size:
+            name = os.path.join(
+                REPO_ROOT, "cache", f"{self.grasp_cache_name}_grasp_50k_s{str(self.base_obj_scale).replace('.', '')}.npy"
+            )
+            np.save(name, self.saved_grasping_states[: self.max_cache_size].cpu().numpy())
+            raise SystemExit(f"saved {self.max_cache_size} grasp poses to {name}")
 
         # skip `AllegroHandHoraEnv._reset_idx` (grasp-cache pose lookup -- not applicable
         # here) and go straight to `DirectRLEnv`'s base bookkeeping.
