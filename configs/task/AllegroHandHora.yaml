@@ -85,7 +85,7 @@ env:
     # sampleProb: [0.35, 0.2, 0.45]
     # type: "sphere_default"
     # sampleProb: [1.0]
-    type: "dextouch_pepper_grinder"
+    type: "dextouch_pear"
     sampleProb: [1.0]
 
   asset:

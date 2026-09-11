@@ -473,6 +473,7 @@ class AllegroHandHoraEnv(DirectRLEnv):
         self.actions = torch.zeros((self.num_envs, self.num_actions), dtype=torch.float, device=self.device)
         self.torques = torch.zeros((self.num_envs, self.num_actions), dtype=torch.float, device=self.device)
         self.dof_vel_finite_diff = torch.zeros((self.num_envs, self.num_dofs), dtype=torch.float, device=self.device)
+        self._previous_dof_pos = self.hand.data.joint_pos.clone()
         self.rb_forces = torch.zeros((self.num_envs, 1, 3), dtype=torch.float, device=self.device)
 
         assert isinstance(self.p_gain_scalar, (int, float)) and isinstance(self.d_gain_scalar, (int, float))
@@ -725,10 +726,12 @@ class AllegroHandHoraEnv(DirectRLEnv):
             self.hand.set_joint_position_target(self.cur_targets)
             return
 
-        previous_dof_pos = self.hand.data.joint_pos.clone()
         dof_pos = self.hand.data.joint_pos
-        dof_vel = (dof_pos - previous_dof_pos) / self.physics_dt
-        self.dof_vel_finite_diff = dof_vel.clone()
+        # IsaacLab refreshes joint_pos lazily: two reads in this call return the
+        # same state. Keep the previous physics step's positions independently.
+        dof_vel = (dof_pos - self._previous_dof_pos) / self.physics_dt
+        self.dof_vel_finite_diff.copy_(dof_vel)
+        self._previous_dof_pos.copy_(dof_pos)
 
         pos_error = self.cur_targets - dof_pos
         torques = self.p_gain * pos_error - self.d_gain * dof_vel
@@ -866,6 +869,8 @@ class AllegroHandHoraEnv(DirectRLEnv):
         if not self.torque_control:
             self.hand.set_joint_position_target(dof_pos, env_ids=env_ids)
         self.hand.write_joint_state_to_sim(dof_pos, dof_vel, env_ids=env_ids)
+        self._previous_dof_pos[env_ids] = dof_pos
+        self.dof_vel_finite_diff[env_ids] = 0.0
 
         self.obs_buf_lag_history[env_ids] = 0
         self.priv_info_buf[env_ids, 0:3] = 0

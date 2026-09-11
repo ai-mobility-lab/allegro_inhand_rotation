@@ -309,6 +309,16 @@ def main():
         finger = tactile_name.split("_")[0]
         baseline = scene[tactile_name].get_initial_render()
         nominal_depth[finger] = baseline["distance_to_image_plane"].clone()
+        
+    for tactile_name, _, _ in FINGER_TRIPLES:
+        finger = tactile_name.split("_")[0]
+        if finger != "middle":
+            nominal_depth[finger] = nominal_depth["middle"].clone()
+            
+    for tactile_name, _, _ in FINGER_TRIPLES:
+        finger = tactile_name.split("_")[0]
+        if finger != "middle":
+            scene[tactile_name]._nominal_tactile["distance_to_image_plane"] = nominal_depth["middle"].clone()
 
     os.makedirs(args_cli.save_viz_dir, exist_ok=True)
     print(f"[INFO]: Saving tactile images to: {os.path.abspath(args_cli.save_viz_dir)}")

@@ -224,6 +224,8 @@ class AllegroHandGraspEnv(AllegroHandHoraEnv):
         if not self.torque_control:
             self.hand.set_joint_position_target(pos, env_ids=env_ids)
         self.hand.write_joint_state_to_sim(pos, torch.zeros_like(pos), env_ids=env_ids)
+        self._previous_dof_pos[env_ids] = pos
+        self.dof_vel_finite_diff[env_ids] = 0.0
 
         self.obs_buf_lag_history[env_ids] = 0
         self.priv_info_buf[env_ids, 0:3] = 0
