@@ -151,7 +151,7 @@ def main():
         env_cfg,
         render_mode=None if cfg.headless else "human",
         digit_render_cfg=digit_render_cfg,
-        scene_camera_cfg=None,
+        scene_camera_cfgs=None,
     )
     env = HoraDirectEnvWrapper(raw_env, task_cfg_dict)
 

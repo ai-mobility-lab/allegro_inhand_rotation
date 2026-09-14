@@ -19,7 +19,10 @@
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
+import torch
 
 import isaaclab.sim as sim_utils
 from isaaclab.sensors import TiledCamera, TiledCameraCfg
@@ -114,14 +117,8 @@ def build_digit_camera_cfg(tip_link_name: str, render_cfg: GelSightRenderCfg) ->
             focal_length=DIGIT_FOCAL_LENGTH_MM,
             horizontal_aperture=DIGIT_HORIZONTAL_APERTURE_MM,
             vertical_aperture=DIGIT_VERTICAL_APERTURE_MM,
-            # Far clip must stay close to `DIGIT_WORKING_DISTANCE_MM` (12mm): the camera sits
-            # that far from the gel pad at rest and the pad only compresses a couple mm under
-            # load, so nothing legitimate is ever farther than ~15mm away. The old 0.05m (50mm)
-            # far clip was over 3x that -- harmless in an isolated single-finger test (nothing
-            # else is ever that close), but during a real multi-finger grasp it let the camera
-            # see straight past the empty space beyond its own pad and pick up a neighboring
-            # finger instead (surfaced as e.g. the thumb's tactile image showing another finger
-            # rather than the grasped object).
+            # Restrict depth to the neighborhood of the 12 mm working distance.
+            # Camera transform initialization is handled before baseline capture below.
             clipping_range=(0.001, 0.02),
         ),
         offset=TiledCameraCfg.OffsetCfg(pos=DIGIT_CAMERA_OFFSET_POS, rot=DIGIT_CAMERA_OFFSET_ROT, convention="world"),
@@ -196,11 +193,17 @@ def build_scene_camera_cfg(
     focal_length_mm: float = 24.0,
     horizontal_aperture_mm: float = 20.955,
     prim_path: str = "/World/envs/env_.*/scene_cam",
+    up=(0.0, 0.0, 1.0),
 ) -> TiledCameraCfg:
-    """External RGB-D + instance-segmentation camera, aimed from `eye` at `target` (world frame)."""
+    """External RGB-D + instance-segmentation camera, aimed from `eye` at `target` (world frame).
+
+    `up` defaults to world-+Z; pass a horizontal vector instead (e.g. `(1, 0, 0)`) for a
+    near-vertical `eye - target` (a straight-down/-up view) -- `quat_from_forward_up`'s
+    `cross(up, forward)` degenerates to zero when `up` and `forward` are parallel.
+    """
     eye = np.asarray(eye, dtype=np.float64)
     target = np.asarray(target, dtype=np.float64)
-    quat = quat_from_forward_up(target - eye)
+    quat = quat_from_forward_up(target - eye, up=up)
     vertical_aperture_mm = horizontal_aperture_mm * height / width
     return TiledCameraCfg(
         prim_path=prim_path,
@@ -219,18 +222,77 @@ def build_scene_camera_cfg(
     )
 
 
+# 8 compass directions, 45 degrees apart, starting from whatever direction the caller's own
+# `front` eye faces relative to its target and rotating counter-clockwise about the vertical
+# (+Z) axis as seen from above -- e.g. index 2 ("left") sits 90 degrees counter-clockwise
+# from "front". This is just a fixed naming convention (this repo has no other definition of
+# "left"/"right" for the scene, only for the hand's own fingers), not a claim about which way
+# the hand palm actually faces.
+COMPASS_VIEW_NAMES = ("front", "front-left", "left", "back-left", "back", "back-right", "right", "front-right")
+SCENE_CAMERA_VIEW_NAMES = COMPASS_VIEW_NAMES + ("top-down",)
+
+
+def build_scene_camera_cfgs(
+    front_eye,
+    target,
+    views: tuple[str, ...] = SCENE_CAMERA_VIEW_NAMES,
+    width: int = 640,
+    height: int = 480,
+    focal_length_mm: float = 24.0,
+    horizontal_aperture_mm: float = 20.955,
+    prim_path_prefix: str = "/World/envs/env_.*/scene_cam",
+) -> dict[str, TiledCameraCfg]:
+    """One `build_scene_camera_cfg` per name in `views`, orbiting `target`.
+
+    `front_eye` both places the "front" view (passing the old single `--scene_cam_eye`
+    default here reproduces that exact camera) and fixes the shared horizontal
+    radius/height every other compass view reuses, rotated in 45-degree steps around
+    `target`'s vertical axis (see `COMPASS_VIEW_NAMES`). "top-down" is not part of that
+    ring -- it looks straight down at `target` from directly above, at the same
+    eye-to-target distance as "front".
+    """
+    front_eye = np.asarray(front_eye, dtype=np.float64)
+    target_arr = np.asarray(target, dtype=np.float64)
+    rel = front_eye - target_arr
+    radius_xy = float(np.hypot(rel[0], rel[1]))
+    if radius_xy < 1e-6:
+        raise ValueError("front_eye must not sit directly above/below target -- 'front' needs a horizontal direction")
+    z_offset = float(rel[2])
+    front_angle = math.atan2(rel[1], rel[0])
+    dist = float(np.linalg.norm(rel))
+
+    cfgs: dict[str, TiledCameraCfg] = {}
+    for name in views:
+        prim_path = f"{prim_path_prefix}_{name.replace('-', '_')}"
+        if name == "top-down":
+            eye = target_arr + np.array([0.0, 0.0, dist])
+            up = (1.0, 0.0, 0.0)
+        elif name in COMPASS_VIEW_NAMES:
+            angle = front_angle + COMPASS_VIEW_NAMES.index(name) * (math.pi / 4)
+            eye = target_arr + np.array([radius_xy * math.cos(angle), radius_xy * math.sin(angle), z_offset])
+            up = (0.0, 0.0, 1.0)
+        else:
+            raise ValueError(f"unknown scene camera view {name!r}, expected one of {SCENE_CAMERA_VIEW_NAMES}")
+        cfgs[name] = build_scene_camera_cfg(
+            eye, target_arr, width=width, height=height, focal_length_mm=focal_length_mm,
+            horizontal_aperture_mm=horizontal_aperture_mm, prim_path=prim_path, up=up,
+        )
+    return cfgs
+
+
 class DatasetAllegroHandHoraEnv(AllegroHandHoraEnv):
     """`AllegroHandHoraEnv` plus one external scene camera and four DIGIT tactile sensors.
 
-    Pass `digit_render_cfg=None`/`scene_camera_cfg=None` to skip either sensor group (e.g.
-    while iterating on the base policy rollout without paying the rendering cost).
+    Pass `digit_render_cfg=None`/`scene_camera_cfgs=None` (or `{}`) to skip either sensor
+    group (e.g. while iterating on the base policy rollout without paying the rendering
+    cost).
     """
 
-    def __init__(self, cfg, render_mode=None, digit_render_cfg=None, scene_camera_cfg=None, **kwargs):
+    def __init__(self, cfg, render_mode=None, digit_render_cfg=None, scene_camera_cfgs=None, **kwargs):
         self._digit_render_cfg = digit_render_cfg
-        self._scene_camera_cfg = scene_camera_cfg
+        self._scene_camera_cfgs = scene_camera_cfgs or {}
         self.tactile_sensors: dict[str, VisuoTactileSensor] = {}
-        self.scene_cam: TiledCamera | None = None
+        self.scene_cams: dict[str, TiledCamera] = {}
         self.nominal_tactile_depth: dict[str, "torch.Tensor"] = {}
         super().__init__(cfg, render_mode=render_mode, **kwargs)
 
@@ -249,9 +311,10 @@ class DatasetAllegroHandHoraEnv(AllegroHandHoraEnv):
     def _setup_scene(self):
         super()._setup_scene()
 
-        if self._scene_camera_cfg is not None:
-            self.scene_cam = TiledCamera(self._scene_camera_cfg)
-            self.scene.sensors["scene_cam"] = self.scene_cam
+        for name, scene_camera_cfg in self._scene_camera_cfgs.items():
+            scene_cam = TiledCamera(scene_camera_cfg)
+            self.scene_cams[name] = scene_cam
+            self.scene.sensors[f"scene_cam_{name.replace('-', '_')}"] = scene_cam
 
         if self._digit_render_cfg is not None:
             
@@ -334,6 +397,20 @@ class DatasetAllegroHandHoraEnv(AllegroHandHoraEnv):
         captures the baseline from the naturally-uncontacted pre-reset state instead of
         manufacturing one.
         """
+        if settle_steps < 1:
+            raise ValueError("settle_steps must be at least 1 to render the restored tactile camera poses.")
+
+        # XformPrimView's first Fabric pose read seeds a world transform from USD.
+        # For cameras under articulation links, that can disagree with the live
+        # PhysX pose even though the authored local offset is correct. Reauthor
+        # those offsets after all cameras initialize, then render before capturing
+        # the baseline. This is the same refresh performed by the pose tuner, and
+        # avoids patching IsaacLab or compensating with incorrect camera offsets.
+        for sensor in self.tactile_sensors.values():
+            camera = sensor._camera_sensor
+            local_pos, local_quat = camera._view.get_local_poses()
+            camera._view.set_local_poses(local_pos, local_quat)
+
         is_rendering = self.sim.has_gui() or self.sim.has_rtx_sensors()
         for _ in range(settle_steps):
             self.scene.write_data_to_sim()
@@ -345,28 +422,13 @@ class DatasetAllegroHandHoraEnv(AllegroHandHoraEnv):
         self.nominal_tactile_depth = {}
         for finger, sensor in self.tactile_sensors.items():
             baseline = sensor.get_initial_render()
-            self.nominal_tactile_depth[finger] = baseline["distance_to_image_plane"].clone()
-
-        # All four DIGIT sensors are the same physical rig (identical elastomer geometry,
-        # identical camera offset -- see DIGIT_CAMERA_OFFSET_POS/ROT), so their no-contact
-        # rest depth should be identical too: index/middle/ring all correctly read a flat
-        # ~10mm here, but the thumb's own camera currently reports `inf` for every pixel (a
-        # separate, unresolved prim-path/offset bug specific to that finger, unrelated to
-        # this no-contact-timing fix). Until that's root-caused, reuse the middle finger's
-        # verified-good baseline for the other three instead of each sensor's own reading.
-        for finger in self.nominal_tactile_depth:
-            if finger != "middle":
-                self.nominal_tactile_depth[finger] = self.nominal_tactile_depth["middle"].clone()
-
-        # `self.nominal_tactile_depth` above only feeds the depth-deformation/mask channel
-        # computed in the collection scripts -- the per-frame tactile *RGB* image instead
-        # comes from `VisuoTactileSensor._update_camera_tactile`, which diffs against each
-        # sensor's own internal `_nominal_tactile` (set by `get_initial_render()` a few lines
-        # up, from the same broken all-`inf` initial camera read for index/ring/thumb). Left
-        # unpatched, that diff is `inf` every frame regardless of the live depth, so
-        # `GelsightRender.render()` sees a constant height map and the RGB image never
-        # changes even though `tactile_depth_image` (a direct per-frame camera clone,
-        # unaffected by this baseline) does. Patch each sensor's internal baseline to match.
-        for finger, sensor in self.tactile_sensors.items():
-            if finger != "middle":
-                sensor._nominal_tactile["distance_to_image_plane"] = self.nominal_tactile_depth[finger].clone()
+            depth = baseline["distance_to_image_plane"]
+            valid = torch.isfinite(depth) & (depth > 0)
+            if not valid.all():
+                invalid_envs = (~valid).flatten(1).any(dim=1).nonzero().flatten().tolist()
+                raise RuntimeError(
+                    f"Invalid no-contact tactile depth for {finger} in environments {invalid_envs}. "
+                    "Check camera placement and rendering before collecting a dataset."
+                )
+            # Keep the same per-finger reference used internally for tactile RGB.
+            self.nominal_tactile_depth[finger] = depth.clone()

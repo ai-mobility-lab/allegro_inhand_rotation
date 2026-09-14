@@ -5,9 +5,9 @@
 #   <object_name>/<episode_idx>/
 #     data.pkl                                    -- object/allegro/digit_info/realsense/time
 #     allegro/<finger>/{image,depth,mask}/<i>.jpg  -- per-finger DIGIT tactile frames
-#     realsense/<camera_name>/image/<i>.jpg        -- external RGB frames
-#     realsense/<camera_name>/seg/<i>.jpg          -- external seg frames (0=bg, 127=hand, 255=object)
-#     realsense/<camera_name>/depth.npz            -- stacked external depth, meters
+#     realsense/<camera_name>/image/<i>.jpg        -- external RGB frames, one <camera_name>
+#     realsense/<camera_name>/seg/<i>.jpg          -- subtree per requested scene-camera view
+#     realsense/<camera_name>/depth.npz            -- (see `sensors.SCENE_CAMERA_VIEW_NAMES`)
 #
 # This is a from-scratch generator, not a bit-exact clone of the real dataset -- notably,
 # depth here is stored as plain positive meters (camera-to-surface distance), not
@@ -84,16 +84,17 @@ scene_segmentation_image._warned_no_match = False
 class EpisodeWriter:
     """Accumulates one episode's frames/poses and writes them out in feelsight layout."""
 
-    def __init__(self, object_root: Path, episode_idx: int, camera_name: str = "front", jpg_quality: int = 92):
+    def __init__(self, object_root: Path, episode_idx: int, camera_names=("front",), jpg_quality: int = 92):
         self.dir = Path(object_root) / f"{episode_idx:02d}"
-        self.camera_name = camera_name
+        self.camera_names = tuple(camera_names)
         self.jpg_quality = jpg_quality
 
         for finger in FINGER_NAMES:
             for sub in ("image", "depth", "mask"):
                 (self.dir / "allegro" / finger / sub).mkdir(parents=True, exist_ok=True)
-        (self.dir / "realsense" / camera_name / "image").mkdir(parents=True, exist_ok=True)
-        (self.dir / "realsense" / camera_name / "seg").mkdir(parents=True, exist_ok=True)
+        for camera_name in self.camera_names:
+            (self.dir / "realsense" / camera_name / "image").mkdir(parents=True, exist_ok=True)
+            (self.dir / "realsense" / camera_name / "seg").mkdir(parents=True, exist_ok=True)
 
         self.frame_idx = 0
         self.times: list[float] = []
@@ -101,8 +102,8 @@ class EpisodeWriter:
         self.finger_poses: list[np.ndarray] = []
         self.joint_states: list[np.ndarray] = []
         self.base_pose: np.ndarray | None = None
-        self.realsense_poses: list[np.ndarray] = []
-        self.realsense_depth_frames: list[np.ndarray] = []
+        self.realsense_poses: dict[str, list[np.ndarray]] = {name: [] for name in self.camera_names}
+        self.realsense_depth_frames: dict[str, list[np.ndarray]] = {name: [] for name in self.camera_names}
 
     @staticmethod
     def _save_gray(arr_uint8: np.ndarray, path: Path, quality: int = 95, rotate=False):
@@ -126,11 +127,10 @@ class EpisodeWriter:
         joint_state: np.ndarray,
         base_pose: np.ndarray,
         tactile: dict,
-        scene_rgb: np.ndarray,
-        scene_depth: np.ndarray,
-        scene_seg: np.ndarray,
-        scene_cam_pose: np.ndarray,
+        scene_frames: dict,
     ):
+        """`scene_frames`: one `{"rgb", "depth", "seg", "cam_pose"}` dict per camera name in
+        `self.camera_names` (see `dataset_collection.sensors.build_scene_camera_cfgs`)."""
         i = self.frame_idx
         self.times.append(t)
         self.object_poses.append(object_pose)
@@ -142,26 +142,28 @@ class EpisodeWriter:
         for finger in FINGER_NAMES:
             img, depth_u8, mask_u8 = tactile[finger]
             # rotate images left -> bottom, right -> top
-            
+
             self._save_rgb(img, self.dir / "allegro" / finger / "image" / f"{i}.jpg", self.jpg_quality, rotate=True)
             self._save_gray(depth_u8, self.dir / "allegro" / finger / "depth" / f"{i}.jpg", rotate=True)
             self._save_gray(mask_u8, self.dir / "allegro" / finger / "mask" / f"{i}.jpg", rotate=True)
 
-        self._save_rgb(scene_rgb, self.dir / "realsense" / self.camera_name / "image" / f"{i}.jpg", self.jpg_quality)
-        self._save_gray(scene_seg, self.dir / "realsense" / self.camera_name / "seg" / f"{i}.jpg")
-
-        self.realsense_depth_frames.append(np.asarray(scene_depth, dtype=np.float32))
-        self.realsense_poses.append(scene_cam_pose)
+        for camera_name in self.camera_names:
+            frame = scene_frames[camera_name]
+            self._save_rgb(frame["rgb"], self.dir / "realsense" / camera_name / "image" / f"{i}.jpg", self.jpg_quality)
+            self._save_gray(frame["seg"], self.dir / "realsense" / camera_name / "seg" / f"{i}.jpg")
+            self.realsense_depth_frames[camera_name].append(np.asarray(frame["depth"], dtype=np.float32))
+            self.realsense_poses[camera_name].append(frame["cam_pose"])
 
         self.frame_idx += 1
 
     def finalize(self, object_name: str, object_mesh, digit_info: dict, realsense_intrinsics: dict):
-        depth_stack = np.stack(self.realsense_depth_frames, axis=0)
-        np.savez(
-            self.dir / "realsense" / self.camera_name / "depth.npz",
-            depth=depth_stack,
-            depth_scale=np.float32(1.0),
-        )
+        for camera_name in self.camera_names:
+            depth_stack = np.stack(self.realsense_depth_frames[camera_name], axis=0)
+            np.savez(
+                self.dir / "realsense" / camera_name / "depth.npz",
+                depth=depth_stack,
+                depth_scale=np.float32(1.0),
+            )
 
         data = {
             "object": {
@@ -176,11 +178,12 @@ class EpisodeWriter:
             },
             "digit_info": digit_info,
             "realsense": {
-                self.camera_name: {
+                camera_name: {
                     "depth_scale": 1.0,
-                    "pose": np.stack(self.realsense_poses, axis=0).astype(np.float32),
+                    "pose": np.stack(self.realsense_poses[camera_name], axis=0).astype(np.float32),
                     "intrinsics": realsense_intrinsics,
                 }
+                for camera_name in self.camera_names
             },
             "time": np.asarray(self.times, dtype=np.float64),
         }

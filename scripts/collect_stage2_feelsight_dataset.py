@@ -45,6 +45,10 @@ OmegaConf.register_new_resolver(
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DIGIT_CALIB_DIR = REPO_ROOT / "assets/digit_data"
+# mirrors `dataset_collection.sensors.SCENE_CAMERA_VIEW_NAMES` -- duplicated here (rather than
+# imported) since this module's arg parser runs before `AppLauncher`, and `sensors.py` pulls
+# in `isaaclab`/`isaaclab_contrib`, which aren't safe to import until the sim app exists.
+DEFAULT_CAMERA_VIEWS = ("front", "front-left", "left", "back-left", "back", "back-right", "right", "front-right", "top-down")
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -59,8 +63,17 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--episode_steps", type=int, default=300, help="control steps per episode (HORA default episodeLength=400)")
     parser.add_argument("--output_dir", default=str(REPO_ROOT / "data/feelsight_sim"))
     parser.add_argument("--object_name", default=None, help="label for object.name / the output subfolder; defaults to task.env.object.type")
-    parser.add_argument("--camera_name", default="front", help="name of the external RGB-D camera, mirrors feelsight's 'realsense/<camera_name>'")
-    parser.add_argument("--scene_cam_eye", type=float, nargs=3, default=(0.55, -0.45, 0.85), metavar=("X", "Y", "Z"))
+    parser.add_argument(
+        "--camera_views", nargs="+", default=list(DEFAULT_CAMERA_VIEWS), choices=list(DEFAULT_CAMERA_VIEWS),
+        help="external RGB-D scene cameras to record, each written to its own 'realsense/<view>' "
+        "subfolder (mirrors feelsight's 'realsense/<camera_name>'); pass e.g. `--camera_views front` "
+        "to record only the single original view",
+    )
+    parser.add_argument(
+        "--scene_cam_eye", type=float, nargs=3, default=(0.55, -0.45, 0.85), metavar=("X", "Y", "Z"),
+        help="eye position of the 'front' view; every other --camera_views entry orbits around "
+        "--scene_cam_target at this same radius/height (see build_scene_camera_cfgs)",
+    )
     parser.add_argument("--scene_cam_target", type=float, nargs=3, default=(0.0, 0.0, 0.5), metavar=("X", "Y", "Z"), help="default matches the hand's fixed base position")
     parser.add_argument("--scene_cam_width", type=int, default=640)
     parser.add_argument("--scene_cam_height", type=int, default=480)
@@ -123,7 +136,7 @@ def main():
         FINGER_NAMES,
         DatasetAllegroHandHoraEnv,
         build_digit_render_cfg,
-        build_scene_camera_cfg,
+        build_scene_camera_cfgs,
         pinhole_intrinsics,
         pose_to_matrix,
     )
@@ -160,9 +173,10 @@ def main():
     task_cfg_dict = omegaconf_to_dict(cfg.task)
 
     digit_render_cfg = build_digit_render_cfg(args_cli.digit_calib_dir)
-    scene_camera_cfg = build_scene_camera_cfg(
-        eye=args_cli.scene_cam_eye,
+    scene_camera_cfgs = build_scene_camera_cfgs(
+        front_eye=args_cli.scene_cam_eye,
         target=args_cli.scene_cam_target,
+        views=tuple(args_cli.camera_views),
         width=args_cli.scene_cam_width,
         height=args_cli.scene_cam_height,
     )
@@ -176,7 +190,7 @@ def main():
         env_cfg,
         render_mode=None if cfg.headless else "human",
         digit_render_cfg=digit_render_cfg,
-        scene_camera_cfg=scene_camera_cfg,
+        scene_camera_cfgs=scene_camera_cfgs,
     )
     env = HoraDirectEnvWrapper(raw_env, task_cfg_dict)
 
@@ -238,7 +252,7 @@ def main():
     raw_env.capture_initial_tactile_render()
 
     for ep in range(args_cli.num_episodes):
-        writer = EpisodeWriter(output_root, ep, camera_name=args_cli.camera_name)
+        writer = EpisodeWriter(output_root, ep, camera_names=args_cli.camera_views)
         obs_dict = env.reset()
 
         base_pos = raw_env.hand.data.root_pos_w[0].detach().cpu().numpy()
@@ -286,16 +300,23 @@ def main():
                 mask_img = np.array(Image.fromarray(mask_u8, mode="L").resize(tactile_size, Image.NEAREST))
                 tactile[finger] = (img, depth_img, mask_img)
 
-            # -- external RGB-D + segmentation camera --
-            scene_data = raw_env.scene_cam.data
-            scene_rgb = scene_data.output["rgb"][0].detach().cpu().numpy().astype(np.uint8)
-            scene_depth = scene_data.output["distance_to_image_plane"][0, ..., 0].detach().cpu().numpy()
-            seg_ids = scene_data.output["instance_segmentation_fast"][0].detach().cpu().numpy()
-            seg_info = scene_data.info.get("instance_segmentation_fast") if scene_data.info else None
-            scene_seg = scene_segmentation_image(seg_ids, seg_info)
-            cam_pos = scene_data.pos_w[0].detach().cpu().numpy()
-            cam_quat = scene_data.quat_w_world[0].detach().cpu().numpy()
-            scene_cam_pose = pose_to_matrix(cam_pos, cam_quat)
+            # -- external RGB-D + segmentation cameras, one per --camera_views entry --
+            scene_frames = {}
+            for view_name, scene_cam in raw_env.scene_cams.items():
+                scene_data = scene_cam.data
+                scene_rgb = scene_data.output["rgb"][0].detach().cpu().numpy().astype(np.uint8)
+                scene_depth = scene_data.output["distance_to_image_plane"][0, ..., 0].detach().cpu().numpy()
+                seg_ids = scene_data.output["instance_segmentation_fast"][0].detach().cpu().numpy()
+                seg_info = scene_data.info.get("instance_segmentation_fast") if scene_data.info else None
+                scene_seg = scene_segmentation_image(seg_ids, seg_info)
+                cam_pos = scene_data.pos_w[0].detach().cpu().numpy()
+                cam_quat = scene_data.quat_w_world[0].detach().cpu().numpy()
+                scene_frames[view_name] = {
+                    "rgb": scene_rgb,
+                    "depth": scene_depth,
+                    "seg": scene_seg,
+                    "cam_pose": pose_to_matrix(cam_pos, cam_quat),
+                }
 
             writer.add_step(
                 t=step * control_dt,
@@ -304,10 +325,7 @@ def main():
                 joint_state=joint_state,
                 base_pose=base_pose,
                 tactile=tactile,
-                scene_rgb=scene_rgb,
-                scene_depth=scene_depth,
-                scene_seg=scene_seg,
-                scene_cam_pose=scene_cam_pose,
+                scene_frames=scene_frames,
             )
 
             if bool(dones[0]):

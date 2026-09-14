@@ -181,7 +181,7 @@ def main():
     env_cfg = build_hora_env_cfg(task_cfg_dict, cfg.sim_device, cfg.graphics_device_id, headless=False)
 
     raw_env = DatasetAllegroHandHoraEnv(
-        env_cfg, render_mode="human", digit_render_cfg=digit_render_cfg, scene_camera_cfg=None,
+        env_cfg, render_mode="human", digit_render_cfg=digit_render_cfg, scene_camera_cfgs=None,
     )
     env = HoraDirectEnvWrapper(raw_env, task_cfg_dict)
 
