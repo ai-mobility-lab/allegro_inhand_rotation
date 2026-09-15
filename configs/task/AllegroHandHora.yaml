@@ -85,7 +85,7 @@ env:
     # sampleProb: [0.35, 0.2, 0.45]
     # type: "sphere_default"
     # sampleProb: [1.0]
-    type: "dextouch_pear"
+    type: "ycb_002_master_chef_can"
     sampleProb: [1.0]
 
   asset:

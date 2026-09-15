@@ -17,6 +17,7 @@ from glob import glob
 
 import numpy as np
 import torch
+from pxr import Usd
 
 import isaaclab.sim as sim_utils
 from isaaclab.actuators import ImplicitActuatorCfg
@@ -59,6 +60,34 @@ def _stable_usd_cache_dir(source_path: str) -> str:
     """
     stem = os.path.splitext(os.path.basename(source_path))[0]
     return os.path.join(os.path.dirname(source_path), "usd_cache", stem)
+
+
+def _make_mesh_materials_opaque(converter: sim_utils.MeshConverter) -> None:
+    """Repair YCB's Meshlab `Tr 1` materials without replacing their textures.
+
+    The importer maps these materials to OmniPBR_Opacity with opacity_constant=0.
+    Edit the geometry layer itself because materials beneath an instanceable
+    reference cannot be overridden on the instance. Run on cache hits too so
+    previously converted, invisible assets are repaired without reconversion.
+    """
+    usd_path = (
+        os.path.join(converter.usd_dir, converter.usd_instanceable_meshes_path)
+        if converter.cfg.make_instanceable
+        else converter.usd_path
+    )
+    stage = Usd.Stage.Open(usd_path)
+    changed = False
+    # Exported geometry layers can have an `over` ancestor, so include undefined prims.
+    for prim in stage.TraverseAll():
+        if prim.GetTypeName() != "Shader":
+            continue
+        for name, value in (("inputs:opacity_constant", 1.0), ("inputs:enable_opacity", False)):
+            attr = prim.GetAttribute(name)
+            if attr and attr.Get() != value:
+                attr.Set(value)
+                changed = True
+    if changed:
+        stage.GetRootLayer().Save()
 
 
 # Placeholder tuning values -- matches the numbers `inhand_rotation`'s own `ALLEGRO_HAND_DIGIT_CFG`
@@ -537,6 +566,7 @@ class AllegroHandHoraEnv(DirectRLEnv):
         rigid_props: sim_utils.RigidBodyPropertiesCfg,
         collision_props: sim_utils.CollisionPropertiesCfg,
         mass_props: sim_utils.MassPropertiesCfg,
+        force_opaque: bool = False,
     ) -> str:
         """Lazily convert an OBJ/STL mesh (from a `assets/{ycb,dextouch}/*.urdf`
         object's `<visual><mesh>`) to USD via IsaacLab's `MeshConverter`, memoized per
@@ -573,6 +603,8 @@ class AllegroHandHoraEnv(DirectRLEnv):
                     mass_props=mass_props,
                 )
             )
+            if force_opaque:
+                _make_mesh_materials_opaque(converter)
             self._mesh_usd_cache[mesh_path] = converter.usd_path
         return self._mesh_usd_cache[mesh_path]
 
@@ -634,7 +666,11 @@ class AllegroHandHoraEnv(DirectRLEnv):
                 # time.
                 shape_cfg = sim_utils.UsdFileCfg(
                     usd_path=self._get_mesh_usd_path(
-                        spec["mesh_path"], object_rigid_props, object_collision_props, object_mass_props
+                        spec["mesh_path"],
+                        object_rigid_props,
+                        object_collision_props,
+                        object_mass_props,
+                        force_opaque=spec.get("force_opaque", False),
                     ),
                     scale=(mx * obj_scale, my * obj_scale, mz * obj_scale),
                 )
@@ -956,6 +992,7 @@ class AllegroHandHoraEnv(DirectRLEnv):
                     self.object_type_list += names
                     for name, f in zip(names, files):
                         self.object_shape_specs[name] = _parse_mesh_geometry(f)
+                        self.object_shape_specs[name]["force_opaque"] = mesh_set == "ycb"
                     self.object_type_prob += [raw_prob[p_id] / len(names) for _ in names]
                     break
                 else:
