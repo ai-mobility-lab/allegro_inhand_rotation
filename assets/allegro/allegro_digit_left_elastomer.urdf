@@ -535,9 +535,9 @@ and one fixed link will be added for the tip. -->
     <parent link="link_12_0"/>
     <child link="link_13_0"/>
     <!-- RIGHT -->
-    <origin xyz="-0.027 0.005 0.0399"/>
+    <!-- <origin xyz="-0.027 0.005 0.0399"/> -->
     <!-- LEFT -->
-    <!-- <origin xyz="-0.027 -0.005 0.0399"/> -->
+    <origin xyz="-0.027 -0.005 0.0399"/>
   </joint>
   <link name="link_14_0">
     <inertial>
@@ -611,7 +611,7 @@ and one fixed link will be added for the tip. -->
   <joint name="joint_15_0_tip" type="fixed">
     <parent link="link_15_0"/>
     <child link="link_15_0_tip"/>
-    <origin rpy="0 0 0" xyz="0 0 0.0303"/>
+    <origin rpy="0 0 1.047" xyz="0 0 0.0303"/>
     <!--0.0267000000000005-->
   </joint>
   <link name="link_15_0_tip_elastomer">

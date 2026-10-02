@@ -1,4 +1,5 @@
 from hora.tasks.isaaclab.allegro_hand_grasp_env import AllegroHandGraspEnv
+from hora.tasks.isaaclab.allegro_hand_contact_hora_env import AllegroHandContactHoraEnv
 from hora.tasks.isaaclab.allegro_hand_hora_env import AllegroHandHoraEnv, build_hora_env_cfg
 from hora.tasks.isaaclab.wrapper import HoraDirectEnvWrapper
 
@@ -6,6 +7,12 @@ from hora.tasks.isaaclab.wrapper import HoraDirectEnvWrapper
 def AllegroHandHora(config, sim_device, graphics_device_id, headless):
     cfg = build_hora_env_cfg(config, sim_device, graphics_device_id, headless)
     env = AllegroHandHoraEnv(cfg, render_mode=None if headless else "human")
+    return HoraDirectEnvWrapper(env, config)
+
+
+def AllegroHandContactHora(config, sim_device, graphics_device_id, headless):
+    cfg = build_hora_env_cfg(config, sim_device, graphics_device_id, headless)
+    env = AllegroHandContactHoraEnv(cfg, render_mode=None if headless else "human")
     return HoraDirectEnvWrapper(env, config)
 
 
@@ -27,5 +34,6 @@ isaaclab_task_map = {
     "LeftAllegroHandHora": AllegroHandHora,       # allgero v4 left hand
     "LeftAllegroHandGrasp": AllegroHandGrasp,
     "LeftAllegroHandDigitHora": AllegroHandHora,  # left hand w/ DIGIT tactile fingertips
+    "LeftAllegroHandDigitContactHora": AllegroHandContactHora,
     "LeftAllegroHandDigitGrasp": AllegroHandGrasp,
 }

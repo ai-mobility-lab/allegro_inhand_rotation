@@ -54,6 +54,23 @@ from hora.utils.misc import set_np_formatting, set_seed, git_hash, git_diff_conf
 
 import wandb
 
+
+class Tee:
+    """Mirrors writes to multiple streams (e.g. real stdout + a log file)."""
+
+    def __init__(self, *streams):
+        self.streams = streams
+
+    def write(self, data):
+        for s in self.streams:
+            s.write(data)
+            s.flush()
+
+    def flush(self):
+        for s in self.streams:
+            s.flush()
+
+
 # OmegaConf & Hydra Config
 OmegaConf.register_new_resolver("eq", lambda x, y: x.lower() == y.lower())
 OmegaConf.register_new_resolver("contains", lambda x, y: x.lower() in y.lower())
@@ -77,6 +94,15 @@ def main(config: DictConfig):
     config.seed = set_seed(config.seed)
 
     date = str(datetime.datetime.now().strftime("%m%d%H%M"))
+
+    output_dif = os.path.join("outputs", config.train.ppo.output_name)
+    os.makedirs(output_dif, exist_ok=True)
+
+    log_path = os.path.join(output_dif, f"log_{date}.txt")
+    log_file = open(log_path, "a")
+    sys.stdout = Tee(sys.stdout, log_file)
+    sys.stderr = Tee(sys.stderr, log_file)
+    cprint(f"Logging terminal output to {log_path}", "cyan", attrs=["bold"])
 
     # Initialize wandb if enabled
     if config.wandb.enabled:
@@ -110,9 +136,6 @@ def main(config: DictConfig):
         graphics_device_id=config.graphics_device_id,
         headless=config.headless,
     )
-
-    output_dif = os.path.join("outputs", config.train.ppo.output_name)
-    os.makedirs(output_dif, exist_ok=True)
 
     agent = eval(config.train.algo)(env, output_dif, full_config=config)
 

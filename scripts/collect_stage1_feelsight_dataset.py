@@ -29,6 +29,8 @@
 #       --checkpoint outputs/LeftAllegroHandDigitHora/baseline/stage1_nn/best.pth \
 #       --num_episodes 5 --episode_steps 300 --output_dir data/feelsight_sim
 #
+# Also supports --task LeftAllegroHandDigitContactHora with a matching checkpoint.
+#
 # Extra Hydra-style overrides (e.g. to change the manipulated object) can be appended
 # after a bare `--`, e.g. `-- task.env.object.type=cylinder_default`.
 # --------------------------------------------------------
@@ -64,8 +66,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--task", default="LeftAllegroHandDigitHora")
     parser.add_argument(
         "--checkpoint",
-        default=str(REPO_ROOT / "outputs/LeftAllegroHandDigitHora/baseline/stage1_nn/best.pth"),
-        help="stage-1 (PPO) checkpoint, e.g. outputs/<task>/<run>/stage1_nn/best.pth",
+        default=None,
+        help="defaults to outputs/<task>/baseline/stage1_nn/best.pth; stage-1 (PPO) checkpoint, e.g. outputs/<task>/<run>/stage1_nn/best.pth",
     )
     parser.add_argument("--num_episodes", type=int, default=5)
     parser.add_argument("--episode_steps", type=int, default=300, help="control steps per episode (HORA default episodeLength=400)")
@@ -85,10 +87,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--scene_cam_target", type=float, nargs=3, default=(0.0, 0.0, 0.5), metavar=("X", "Y", "Z"), help="default matches the hand's fixed base position")
     parser.add_argument("--scene_cam_width", type=int, default=640)
     parser.add_argument("--scene_cam_height", type=int, default=480)
-    parser.add_argument("--tactile_width", type=int, default=320, help="tactile images are rendered at the DIGIT's native 640x480 and resized to this for saving")
+    parser.add_argument("--tactile_width", type=int, default=320, help="pre-portrait width: saved tactile height (native render is 640x480)")
     parser.add_argument("--tactile_height", type=int, default=240)
     parser.add_argument("--digit_calib_dir", default=str(DEFAULT_DIGIT_CALIB_DIR), help="dir with bg.jpg + polycalib.npz + real_bg.npy (Taxim calibration)")
-    parser.add_argument("--digit_depth_scale", type=float, default=33333.34, help="gel-deformation-meters -> 8-bit pixel scale for the saved tactile depth/mask frames")
+    parser.add_argument("--neuralfeels_urdf", default=str(REPO_ROOT.parent / "neuralfeels/data/assets/allegro/allegro_digit_left_ball.urdf"),
+                        help="Read-only reference URDF used by the target NeuralFeels loader")
+    parser.add_argument("--digit_depth_scale", type=float, default=33333.34, help="maximum 8-bit depth units per meter; reduced per episode if needed to avoid clipping")
     parser.add_argument("--tactile_mask_eps", type=float, default=3e-4, help="gel deformation (m) above which a tactile pixel counts as 'contact' in the mask frame")
     parser.add_argument("--gt_sdf_voxel_size", type=float, default=5e-4, help="voxel pitch (m) for the ground-truth object gt_sdf_voxel=<...>.npz, matches neuralfeels' default gt_voxel_size")
     parser.add_argument("--seed", type=int, default=42)
@@ -139,25 +143,22 @@ def main():
     from hora.utils.misc import set_seed
     from hora.utils.reformat import omegaconf_to_dict
 
-    from dataset_collection.feelsight_writer import EpisodeWriter, scene_segmentation_image
+    from dataset_collection.feelsight_writer import EpisodeWriter
+    from dataset_collection.neuralfeels_export import NeuralFeelsCapture
     from dataset_collection.gt_sdf import trimesh_from_shape_cfg, write_gt_sdf
     from dataset_collection.sensors import (
-        DIGIT_HORIZONTAL_APERTURE_MM,
-        DIGIT_VERTICAL_APERTURE_MM,
-        DIGIT_FOCAL_LENGTH_MM,
-        DIGIT_WORKING_DISTANCE_MM,
         ELASTOMER_LINKS,
         FINGER_NAMES,
-        DatasetAllegroHandHoraEnv,
+        dataset_env_class,
         build_digit_render_cfg,
         build_scene_camera_cfgs,
-        pinhole_intrinsics,
-        pose_to_matrix,
     )
 
     set_seed(args_cli.seed)
 
-    checkpoint_path = Path(args_cli.checkpoint).resolve()
+    checkpoint_path = Path(
+        args_cli.checkpoint or REPO_ROOT / "outputs" / args_cli.task / "baseline/stage1_nn/best.pth"
+    ).resolve()
     if not checkpoint_path.is_file():
         raise SystemExit(f"stage1 checkpoint not found: {checkpoint_path}")
 
@@ -173,14 +174,16 @@ def main():
             "train.ppo.priv_info=True",
             "wandb.enabled=False",
             "task.env.numEnvs=1",
-            f"task.env.object.type={args_cli.object_name}",
             "task.env.object.sampleProb=[1.0]",
             "task.env.randomization.randomizeMass=False",
             "task.env.randomization.randomizeCOM=False",
             "task.env.randomization.randomizeFriction=False",
             "task.env.randomization.randomizePDGains=False",
             f"checkpoint={checkpoint_path}",
-        ] + extra_overrides
+        ]
+        if args_cli.object_name is not None:
+            overrides.append(f"task.env.object.type={args_cli.object_name}")
+        overrides.extend(extra_overrides)
         cfg = hydra.compose(config_name="config", overrides=overrides)
 
     task_cfg_dict = omegaconf_to_dict(cfg.task)
@@ -199,7 +202,8 @@ def main():
     # unlabeled) background -- mirrors DatasetAllegroHandHoraEnv._build_object_cfg's own
     # ("class", "object") tag on the manipulated object.
     env_cfg.robot_cfg.spawn.semantic_tags = [("class", "robot")]
-    raw_env = DatasetAllegroHandHoraEnv(
+    env_cfg.sim.render_interval = 1
+    raw_env = dataset_env_class(task_cfg_dict["name"])(
         env_cfg,
         render_mode=None if cfg.headless else "human",
         digit_render_cfg=digit_render_cfg,
@@ -239,18 +243,6 @@ def main():
     output_root = Path(args_cli.output_dir) / object_name
     output_root.mkdir(parents=True, exist_ok=True)
 
-    scene_intrinsics = pinhole_intrinsics(
-        args_cli.scene_cam_width, args_cli.scene_cam_height, 24.0, 20.955, 20.955 * args_cli.scene_cam_height / args_cli.scene_cam_width
-    )
-    digit_intrinsics = pinhole_intrinsics(
-        args_cli.tactile_width, args_cli.tactile_height, DIGIT_FOCAL_LENGTH_MM, DIGIT_HORIZONTAL_APERTURE_MM, DIGIT_VERTICAL_APERTURE_MM
-    )
-    digit_info = {
-        "depth_scale": args_cli.digit_depth_scale,
-        "cam_dist": -DIGIT_WORKING_DISTANCE_MM / 1000.0,
-        "intrinsics": digit_intrinsics,
-    }
-
     control_dt = raw_env.step_dt
     body_ids = {f: raw_env.hand.find_bodies(ELASTOMER_LINKS[f])[0][0] for f in FINGER_NAMES}
     tactile_size = (args_cli.tactile_width, args_cli.tactile_height)
@@ -262,6 +254,7 @@ def main():
     # pose, rather than re-capturing it (contaminated by that episode's grasp contact) on
     # every reset. See `capture_initial_tactile_render`'s docstring.
     raw_env.capture_initial_tactile_render()
+    capture = NeuralFeelsCapture(raw_env, tactile_size, args_cli.digit_depth_scale, args_cli.tactile_mask_eps, args_cli.neuralfeels_urdf)
 
     if args_cli.debug_baseline_dir:
         debug_dir = Path(args_cli.debug_baseline_dir)
@@ -298,12 +291,8 @@ def main():
         print(f"[debug] saved baseline hand pose + per-finger RGB/depth to {debug_dir}")
 
     for ep in range(args_cli.num_episodes):
-        writer = EpisodeWriter(output_root, ep, camera_names=args_cli.camera_views)
+        writer = EpisodeWriter(output_root, ep, camera_names=args_cli.camera_views, joint_names=capture.joint_names)
         obs_dict = env.reset()
-
-        base_pos = raw_env.hand.data.root_pos_w[0].detach().cpu().numpy()
-        base_quat = raw_env.hand.data.root_quat_w[0].detach().cpu().numpy()
-        base_pose = pose_to_matrix(base_pos, base_quat)
 
         for step in range(args_cli.episode_steps):
             with torch.no_grad():
@@ -315,70 +304,19 @@ def main():
                 mu = torch.clamp(mu, -1.0, 1.0)
             obs_dict, reward, dones, info = env.step(mu)
 
-            # -- object / hand pose --
-            obj_pos = raw_env.object.data.root_pos_w[0].detach().cpu().numpy()
-            obj_quat = raw_env.object.data.root_quat_w[0].detach().cpu().numpy()
-            object_pose = pose_to_matrix(obj_pos, obj_quat)
-            joint_state = raw_env.hand.data.joint_pos[0].detach().cpu().numpy().astype(np.float32)
-            finger_poses = np.stack(
-                [
-                    pose_to_matrix(
-                        raw_env.hand.data.body_pos_w[0, body_ids[f]].detach().cpu().numpy(),
-                        raw_env.hand.data.body_quat_w[0, body_ids[f]].detach().cpu().numpy(),
-                    )
-                    for f in FINGER_NAMES
-                ],
-                axis=0,
-            )
-
-            # -- DIGIT tactile: image (Taxim RGB), depth + mask (gel deformation) --
-            tactile = {}
-            for finger in FINGER_NAMES:
-                sensor_data = raw_env.tactile_sensors[finger].data
-                rgb = np.clip(sensor_data.tactile_rgb_image[0].detach().cpu().numpy(), 0, 255).astype(np.uint8)
-                depth = sensor_data.tactile_depth_image[0, ..., 0].detach().cpu().numpy()
-                nominal_depth = raw_env.nominal_tactile_depth[finger][0, ..., 0].detach().cpu().numpy()
-                deformation = nominal_depth - depth  # positive = gel pushed in
-                depth_u8 = np.clip(deformation * args_cli.digit_depth_scale, 0, 255).astype(np.uint8)
-                mask_u8 = np.where(deformation > args_cli.tactile_mask_eps, np.uint8(255), np.uint8(0))
-                img = np.array(Image.fromarray(rgb, mode="RGB").resize(tactile_size, Image.BILINEAR))
-                depth_img = np.array(Image.fromarray(depth_u8, mode="L").resize(tactile_size, Image.BILINEAR))
-                mask_img = np.array(Image.fromarray(mask_u8, mode="L").resize(tactile_size, Image.NEAREST))
-                tactile[finger] = (img, depth_img, mask_img)
-
-            # -- external RGB-D + segmentation cameras, one per --camera_views entry --
-            scene_frames = {}
-            for view_name, scene_cam in raw_env.scene_cams.items():
-                scene_data = scene_cam.data
-                scene_rgb = scene_data.output["rgb"][0].detach().cpu().numpy().astype(np.uint8)
-                scene_depth = scene_data.output["distance_to_image_plane"][0, ..., 0].detach().cpu().numpy()
-                seg_ids = scene_data.output["instance_segmentation_fast"][0].detach().cpu().numpy()
-                seg_info = scene_data.info.get("instance_segmentation_fast") if scene_data.info else None
-                scene_seg = scene_segmentation_image(seg_ids, seg_info)
-                cam_pos = scene_data.pos_w[0].detach().cpu().numpy()
-                cam_quat = scene_data.quat_w_world[0].detach().cpu().numpy()
-                scene_frames[view_name] = {
-                    "rgb": scene_rgb,
-                    "depth": scene_depth,
-                    "seg": scene_seg,
-                    "cam_pose": pose_to_matrix(cam_pos, cam_quat),
-                }
-
-            writer.add_step(
-                t=step * control_dt,
-                object_pose=object_pose,
-                finger_poses=finger_poses,
-                joint_state=joint_state,
-                base_pose=base_pose,
-                tactile=tactile,
-                scene_frames=scene_frames,
-            )
-
+            # DirectRLEnv has already reset on done: never mix the new grasp into
+            # this episode, or pair reset poses with a previous rendered image.
             if bool(dones[0]):
-                print(f"[collect] episode {ep}: env reset early at control step {step}")
+                print(f"[collect] episode {ep}: stopped before auto-reset frame at step {step}")
                 break
 
-        writer.finalize(object_name=object_name, object_mesh=object_mesh, digit_info=digit_info, realsense_intrinsics=scene_intrinsics)
+            writer.add_step(t=step * control_dt, **capture.capture())
+
+        if not writer.frame_idx:
+            print(f"[collect] episode {ep}: no valid pre-reset frames; skipping")
+            continue
+        writer.finalize(object_name=object_name, object_mesh=object_mesh,
+                        digit_info=capture.digit_info, realsense_intrinsics=capture.scene_intrinsics)
         gt_sdf_path = write_gt_sdf(writer.dir, gt_mesh, voxel_size=args_cli.gt_sdf_voxel_size)
         print(f"[collect] episode {ep}: wrote {writer.frame_idx} frames to {writer.dir} (+ {gt_sdf_path.name})")
 

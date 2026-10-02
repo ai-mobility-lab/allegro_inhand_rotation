@@ -83,9 +83,9 @@ env:
   object:
     # type: "cylinder_default+cuboid_default+sphere_default" # 'block' # can be block, egg or pen
     # sampleProb: [0.35, 0.2, 0.45]
-    # type: "sphere_default"
+    # type: "cuboid_default"
     # sampleProb: [1.0]
-    type: "ycb_002_master_chef_can"
+    type: "ycb_016_pear"
     sampleProb: [1.0]
 
   asset:

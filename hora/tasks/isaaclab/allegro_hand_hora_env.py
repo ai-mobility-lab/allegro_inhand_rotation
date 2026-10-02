@@ -465,6 +465,9 @@ class AllegroHandHoraEnv(DirectRLEnv):
         self._setup_domain_rand_config(env_cfg["randomization"])
         self._setup_reward_config(env_cfg["reward"])
         self._setup_object_info(env_cfg["object"])
+        # Use the configured type (e.g. cuboid_default), not expanded asset names
+        # such as cuboid_0. Grasp generation inherits this same cache directory.
+        self.grasp_cache_dir = os.path.join(REPO_ROOT, "cache", self.object_type)
         self.prop_hist_len = env_cfg["hora"]["propHistoryLen"]
         self.num_env_factors = env_cfg["hora"]["privInfoDim"]
         self.force_scale = env_cfg.get("forceScale", 0.0)
@@ -520,7 +523,7 @@ class AllegroHandHoraEnv(DirectRLEnv):
             self.saved_grasping_states = {}
             for s in self.randomize_scale_list:
                 cache_path = os.path.join(
-                    REPO_ROOT, "cache", f"{self.grasp_cache_name}_grasp_50k_s{str(s).replace('.', '')}.npy"
+                    self.grasp_cache_dir, f"{self.grasp_cache_name}_grasp_50k_s{str(s).replace('.', '')}.npy"
                 )
                 self.saved_grasping_states[str(s)] = torch.from_numpy(np.load(cache_path)).float().to(self.device)
         else:

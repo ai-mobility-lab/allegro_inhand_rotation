@@ -6,7 +6,8 @@
 # --------------------------------------------------------
 # Modified by Wonik Robotics (2025)
 # IsaacLab port of hora/tasks/allegro_hand_grasp.py. Generates the grasp-pose
-# caches under `cache/*.npy` consumed by `AllegroHandHoraEnv._reset_idx`.
+# caches under `cache/<configured object type>/*.npy` consumed by
+# `AllegroHandHoraEnv._reset_idx`.
 #
 # The original's fingertip-contact check used `isaacgym.gymapi`'s CPU-only
 # `get_env_rigid_contacts`, which is also why the original asserted
@@ -24,7 +25,7 @@ from isaaclab.envs import DirectRLEnv
 from isaaclab.sensors import ContactSensor, ContactSensorCfg
 from isaaclab.utils.math import sample_uniform
 
-from .allegro_hand_hora_env import REPO_ROOT, AllegroHandHoraEnv, tensor_clamp
+from .allegro_hand_hora_env import AllegroHandHoraEnv, tensor_clamp
 
 # link names of the four fingertips in assets/allegro/allegro_hora.urdf (and the
 # left/right variants) -- confirmed against the URDF, not the deploy-side ROS2 mapping.
@@ -167,8 +168,9 @@ class AllegroHandGraspEnv(AllegroHandHoraEnv):
         self.saved_grasping_states = torch.cat([self.saved_grasping_states, all_states[env_ids][success_mask]])
         print("current cache size:", self.saved_grasping_states.shape[0])
         if self.saved_grasping_states.shape[0] >= self.max_cache_size:
+            os.makedirs(self.grasp_cache_dir, exist_ok=True)
             name = os.path.join(
-                REPO_ROOT, "cache", f"{self.grasp_cache_name}_grasp_50k_s{str(self.base_obj_scale).replace('.', '')}.npy"
+                self.grasp_cache_dir, f"{self.grasp_cache_name}_grasp_50k_s{str(self.base_obj_scale).replace('.', '')}.npy"
             )
             np.save(name, self.saved_grasping_states[: self.max_cache_size].cpu().numpy())
             raise SystemExit(f"saved {self.max_cache_size} grasp poses to {name}")

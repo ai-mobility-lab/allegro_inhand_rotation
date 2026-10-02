@@ -1,0 +1,8 @@
+defaults:
+  - LeftAllegroHandDigitHora
+  - _self_
+
+name: LeftAllegroHandDigitContactHora
+ppo:
+  priv_info: True
+  priv_info_dim: ${task.env.hora.privInfoDim}

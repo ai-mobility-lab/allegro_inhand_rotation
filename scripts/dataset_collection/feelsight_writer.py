@@ -9,10 +9,8 @@
 #     realsense/<camera_name>/seg/<i>.jpg          -- subtree per requested scene-camera view
 #     realsense/<camera_name>/depth.npz            -- (see `sensors.SCENE_CAMERA_VIEW_NAMES`)
 #
-# This is a from-scratch generator, not a bit-exact clone of the real dataset -- notably,
-# depth here is stored as plain positive meters (camera-to-surface distance), not
-# neuralfeels' negative OpenGL-convention `z` (see `neuralfeels/datasets/dataset.py`); adapt
-# the sign if feeding this into a loader written against the real feelsight data.
+# Camera poses use OpenGL axes and metric depth is negative camera z.
+# Tactile camera frames match NeuralFeels directly; RGB is saved without reprojection.
 # --------------------------------------------------------
 
 from __future__ import annotations
@@ -23,7 +21,8 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from .sensors import FINGER_NAMES
+from .conventions import FINGER_NAMES
+from .legacy_tactile import projection_intrinsics, depth_encoding, rasterize, encode_depth
 
 
 # (label substring to match in `idToLabels`, pixel value to paint) -- painted in order, so a
@@ -84,10 +83,13 @@ scene_segmentation_image._warned_no_match = False
 class EpisodeWriter:
     """Accumulates one episode's frames/poses and writes them out in feelsight layout."""
 
-    def __init__(self, object_root: Path, episode_idx: int, camera_names=("front",), jpg_quality: int = 92):
+    def __init__(self, object_root: Path, episode_idx: int, camera_names=("front",), jpg_quality: int = 92, joint_names=None):
         self.dir = Path(object_root) / f"{episode_idx:02d}"
+        if self.dir.exists() and any(self.dir.iterdir()):
+            raise FileExistsError(f"Refusing to mix frames with an existing episode: {self.dir}")
         self.camera_names = tuple(camera_names)
         self.jpg_quality = jpg_quality
+        self.joint_names = joint_names
 
         for finger in FINGER_NAMES:
             for sub in ("image", "depth", "mask"):
@@ -102,6 +104,7 @@ class EpisodeWriter:
         self.finger_poses: list[np.ndarray] = []
         self.joint_states: list[np.ndarray] = []
         self.base_pose: np.ndarray | None = None
+        self.tactile_frames = []
         self.realsense_poses: dict[str, list[np.ndarray]] = {name: [] for name in self.camera_names}
         self.realsense_depth_frames: dict[str, list[np.ndarray]] = {name: [] for name in self.camera_names}
 
@@ -118,7 +121,7 @@ class EpisodeWriter:
             Image.fromarray(arr_uint8, mode="RGB").rotate(90, expand=True).save(path, quality=quality)
         else:
             Image.fromarray(arr_uint8, mode="RGB").save(path, quality=quality)
-            
+
     def add_step(
         self,
         t: float,
@@ -136,16 +139,9 @@ class EpisodeWriter:
         self.object_poses.append(object_pose)
         self.finger_poses.append(finger_poses)
         self.joint_states.append(joint_state)
+        self.tactile_frames.append(tactile)
         if self.base_pose is None:
             self.base_pose = base_pose
-
-        for finger in FINGER_NAMES:
-            img, depth_u8, mask_u8 = tactile[finger]
-            # rotate images left -> bottom, right -> top
-
-            self._save_rgb(img, self.dir / "allegro" / finger / "image" / f"{i}.jpg", self.jpg_quality, rotate=True)
-            self._save_gray(depth_u8, self.dir / "allegro" / finger / "depth" / f"{i}.jpg", rotate=True)
-            self._save_gray(mask_u8, self.dir / "allegro" / finger / "mask" / f"{i}.jpg", rotate=True)
 
         for camera_name in self.camera_names:
             frame = scene_frames[camera_name]
@@ -157,6 +153,28 @@ class EpisodeWriter:
         self.frame_idx += 1
 
     def finalize(self, object_name: str, object_mesh, digit_info: dict, realsense_intrinsics: dict):
+        if not self.frame_idx:
+            raise ValueError("Cannot finalize an empty episode")
+        intrinsics = digit_info.get("intrinsics")
+        if intrinsics is None:  # Backward compatibility for virtual-camera samples.
+            intrinsics = projection_intrinsics(self.tactile_frames, digit_info["image_size"])
+        scale, cam_dist = depth_encoding(self.tactile_frames, digit_info["depth_scale"])
+        # The stock loader computes depth_u8 / depth_scale + cam_dist. Reserve
+        # byte zero for no contact and fit the remaining range without saturation.
+        digit_info = dict(intrinsics=intrinsics, depth_scale=scale, cam_dist=cam_dist)
+        for i, frame in enumerate(self.tactile_frames):
+            for finger in FINGER_NAMES:
+                sample = frame[finger]
+                if "depth" in sample:
+                    rgb, depth = sample["rgb"], sample["depth"]
+                else:
+                    rgb, depth = rasterize(sample, intrinsics)
+                encoded, mask = encode_depth(depth, scale, cam_dist)
+                self._save_rgb(rgb, self.dir / "allegro" / finger / "image" / f"{i}.jpg", self.jpg_quality)
+                # OpenCV detects the codec from the header. Keep the filenames the
+                # stock loader requires, but avoid JPEG damage to metric depth/masks.
+                for sub, pixels in (("depth", encoded), ("mask", mask)):
+                    Image.fromarray(pixels).save(self.dir / "allegro" / finger / sub / f"{i}.jpg", format="PNG")
         for camera_name in self.camera_names:
             depth_stack = np.stack(self.realsense_depth_frames[camera_name], axis=0)
             np.savez(
@@ -181,11 +199,13 @@ class EpisodeWriter:
                 camera_name: {
                     "depth_scale": 1.0,
                     "pose": np.stack(self.realsense_poses[camera_name], axis=0).astype(np.float32),
-                    "intrinsics": realsense_intrinsics,
+                    "intrinsics": realsense_intrinsics.get(camera_name, realsense_intrinsics),
                 }
                 for camera_name in self.camera_names
             },
             "time": np.asarray(self.times, dtype=np.float64),
         }
+        if self.joint_names is not None:
+            data["allegro"]["joint_names"] = list(self.joint_names)
         with open(self.dir / "data.pkl", "wb") as f:
             pickle.dump(data, f)

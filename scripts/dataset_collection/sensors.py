@@ -33,8 +33,9 @@ from isaaclab_contrib.sensors.tacsl_sensor import (
 )
 
 from hora.tasks.isaaclab.allegro_hand_hora_env import AllegroHandHoraEnv
+from hora.tasks.isaaclab.allegro_hand_contact_hora_env import AllegroHandContactHoraEnv
 
-FINGER_NAMES = ["index", "middle", "ring", "thumb"]
+from .conventions import FINGER_NAMES, NEURALFEELS_TIP_TO_CAMERA, NEURALFEELS_CAMERA_QUAT_WXYZ
 
 # raw Allegro joint numbering used by `allegro_digit_left_elastomer.urdf` (and by
 # `configs/task/LeftAllegroHandDigitHora.yaml`'s `fingertipLinkNames`): index -> link_3,
@@ -45,18 +46,14 @@ ELASTOMER_LINKS = {f: f"{link}_elastomer" for f, link in HOUSING_LINKS.items()}
 # ---- DIGIT camera intrinsics (Lambeta et al. 2020 spec) -- same constants/derivation as
 # inhand_rotation's `inhand_rotation_env_cfg.py`/`tacsl_sensor_demo.py`.
 DIGIT_FOCAL_LENGTH_MM = 1.15
-DIGIT_WORKING_DISTANCE_MM = 12.0
+DIGIT_WORKING_DISTANCE_MM = 22.0  # nominal distance used to size the field of view
 DIGIT_SENSING_FIELD_MM = (16.0, 19.0)  # (horizontal, vertical)
 DIGIT_HORIZONTAL_APERTURE_MM = DIGIT_FOCAL_LENGTH_MM * DIGIT_SENSING_FIELD_MM[0] / DIGIT_WORKING_DISTANCE_MM
 DIGIT_VERTICAL_APERTURE_MM = DIGIT_FOCAL_LENGTH_MM * DIGIT_SENSING_FIELD_MM[1] / DIGIT_WORKING_DISTANCE_MM
-# camera offset from each link_*_tip housing's own origin (meters): the elastomer pad's
-# bounding-box center in the tip's local frame, `_DIGIT_WORKING_DISTANCE_MM` behind that
-# along local +X. Same numbers as inhand_rotation_env_cfg.py's GRASP_ELASTOMER_LOCAL_OFFSET
-# (this repo's allegro_digit_left_elastomer.urdf shares the same elastomer geometry).
-DIGIT_CAMERA_OFFSET_POS = (0.0181021569 - DIGIT_WORKING_DISTANCE_MM / 1000.0, 0.0000018431, 0.0172339268)
-# local +X -> camera forward, local +Z -> camera up (see tacsl_sensor_demo.py's own comment
-# on this same quaternion).
-DIGIT_CAMERA_OFFSET_ROT = (0.7071068, -0.7071068, 0.0, 0.0)
+# Match Allegro._hora_to_neural exactly. This is a tip-local camera pose in
+# OpenGL convention (-Z forward, +Y up), not IsaacLab's world-axis convention.
+DIGIT_CAMERA_OFFSET_POS = tuple(NEURALFEELS_TIP_TO_CAMERA[:3, 3])
+DIGIT_CAMERA_OFFSET_ROT = NEURALFEELS_CAMERA_QUAT_WXYZ
 
 
 def pinhole_intrinsics(width: int, height: int, focal_length_mm: float, h_aperture_mm: float, v_aperture_mm: float) -> dict:
@@ -112,16 +109,18 @@ def build_digit_camera_cfg(tip_link_name: str, render_cfg: GelSightRenderCfg) ->
         prim_path=f"/World/envs/env_.*/Robot/{tip_link_name}/cam",
         height=render_cfg.image_height,
         width=render_cfg.image_width,
+        update_latest_camera_pose=True,
         data_types=["distance_to_image_plane"],
         spawn=sim_utils.PinholeCameraCfg(
             focal_length=DIGIT_FOCAL_LENGTH_MM,
             horizontal_aperture=DIGIT_HORIZONTAL_APERTURE_MM,
             vertical_aperture=DIGIT_VERTICAL_APERTURE_MM,
-            # Restrict depth to the neighborhood of the 12 mm working distance.
+            # The legacy camera sits behind the housing origin; the gel is now
+            # about 20 mm away, beyond the previous 20 mm far clip.
             # Camera transform initialization is handled before baseline capture below.
-            clipping_range=(0.001, 0.02),
+            clipping_range=(0.001, 0.05),
         ),
-        offset=TiledCameraCfg.OffsetCfg(pos=DIGIT_CAMERA_OFFSET_POS, rot=DIGIT_CAMERA_OFFSET_ROT, convention="world"),
+        offset=TiledCameraCfg.OffsetCfg(pos=DIGIT_CAMERA_OFFSET_POS, rot=DIGIT_CAMERA_OFFSET_ROT, convention="opengl"),
     )
 
 
@@ -156,8 +155,8 @@ def _matrix_to_quat_wxyz(r: np.ndarray) -> tuple[float, float, float, float]:
 def quat_from_forward_up(forward, up=(0.0, 0.0, 1.0)) -> tuple[float, float, float, float]:
     """Quaternion (w, x, y, z) rotating local +X -> `forward`, local +Z -> `up` (right-handed).
 
-    Matches the `convention="world"` interpretation this codebase's own DIGIT camera
-    offsets already use (local +X = forward, local +Z = up) -- see `DIGIT_CAMERA_OFFSET_ROT`.
+    Used by the external scene cameras with `convention="world"`
+    (local +X = forward, local +Z = up). DIGIT offsets use OpenGL instead.
     """
     forward = _normalize(np.asarray(forward, dtype=np.float64))
     up = np.asarray(up, dtype=np.float64)
@@ -432,3 +431,18 @@ class DatasetAllegroHandHoraEnv(AllegroHandHoraEnv):
                 )
             # Keep the same per-finger reference used internally for tactile RGB.
             self.nominal_tactile_depth[finger] = depth.clone()
+
+
+class DatasetAllegroHandContactHoraEnv(DatasetAllegroHandHoraEnv, AllegroHandContactHoraEnv):
+    """Dataset cameras plus the contact task's force observations and reward.
+
+    Cooperative super() calls initialize the contact task and its sensors before
+    adding the dataset cameras, while retaining the dataset object semantic tags.
+    """
+
+
+def dataset_env_class(task_name: str):
+    """Select the rollout implementation from the composed Hydra task name."""
+    if task_name == "LeftAllegroHandDigitContactHora":
+        return DatasetAllegroHandContactHoraEnv
+    return DatasetAllegroHandHoraEnv

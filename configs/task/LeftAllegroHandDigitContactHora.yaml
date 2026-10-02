@@ -1,0 +1,14 @@
+defaults:
+  - LeftAllegroHandDigitHora
+  - _self_
+
+name: LeftAllegroHandDigitContactHora
+env:
+  hora:
+    # Original 9 values + xyz normal force (world frame, N) for each of 4 pads.
+    privInfoDim: 21
+  contact:
+    forceThreshold: 1.0  # N; force magnitude must exceed this to count a pad
+  reward:
+    # Added per contacting elastomer, giving a bonus from 0 to 0.4 per step.
+    fingertipContactRewardScale: 0.1
